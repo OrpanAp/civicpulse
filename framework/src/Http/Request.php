@@ -65,7 +65,9 @@ class Request
     {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        $headers = function_exists('getallheaders')
+            ? (getallheaders() ?: [])
+            : [];
         $body = file_get_contents('php://input') ?: '';
 
         return new self($method, $uri, $headers, $body);
