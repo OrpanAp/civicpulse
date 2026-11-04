@@ -6,7 +6,11 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use CivicPulse\Framework\Http\Request;
 
-$request = Request::createFromGlobals();
+$request = new Request(
+    'GET',
+    '/reports?page=5&status=pending'
+);
 
-echo $request->getMethod() . PHP_EOL;
-echo $request->getPath() . PHP_EOL;
+var_dump($request->getQueryParam('page'));
+var_dump($request->getQueryParam('status'));
+var_dump($request->getQueryParam('category', 'all'));
