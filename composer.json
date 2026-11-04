@@ -1,0 +1,19 @@
+{
+  "name": "civicpulse/platform",
+  "description": "CivicPulse civic infrastructure reporting platform built on a custom PHP framework",
+  "type": "project",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "AlexAp",
+      "email": "orpan.purification@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "CivicPulse\\Framework\\": "framework/src/",
+      "App\\": "app/"
+    }
+  },
+  "require": {}
+}
