@@ -319,13 +319,46 @@ The connection integration test currently overrides the MySQL test connection to
 
 Important limitations and verification boundaries:
 
-- PostgreSQL's PDO extension (`pdo_pgsql`) is now enabled and listed by PHP, but a PostgreSQL server connection has not yet been tested. The `psql` command is not currently available in Git Bash (`command not found`); this alone does not establish whether a PostgreSQL Windows service is installed. SQLite's PDO extension (`pdo_sqlite`) is enabled, and actual runtime operations through CivicPulse's `ConnectionFactory` and `Connection` have passed locally.
+- PostgreSQL 18.6 runtime integration is now verified locally through CivicPulse's `PostgreSqlDriver`, `ConnectionFactory`, `DatabaseManager`, and `Connection`. The developer installed PostgreSQL Server 18.6, enabled `pdo_pgsql`, created the dedicated `civicpulse_test` database, and passed connection, server-version, parameterized-query, connection-caching, temporary-table, transaction-commit, and transaction-rollback checks. This is local integration evidence, not production verification.
 - MariaDB is reached through PDO's `pdo_mysql` driver; it does not require a separate `pdo_mariadb` extension.
 - The current database configuration reads process environment variables with `getenv()`. A project environment-file loader has not yet been implemented.
 - The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
 - The inspected GitHub `main` branch contains the listed database implementation files. Local uncommitted changes may still differ from the remote branch; verify with `git status --short` and local file inspection before continuing.
 
-**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have all passed their respective local test scripts. PostgreSQL and SQLite runtime support remain unverified. The hardening changes and test files are committed and present in the remote repository at `d49657c`.
+**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have passed their respective local test scripts. SQLite runtime support has passed through CivicPulse's PDO connection layer. PostgreSQL 18.6 runtime integration has now also passed through the existing CivicPulse classes, including connection, parameterized query, connection caching, temporary-table creation, commit, and rollback. The hardening changes and test files are committed and present in the remote repository at `d49657c`; the PostgreSQL integration was performed with an inline local test and did not modify repository source files.
+
+### 5.8 PostgreSQL 18.6 runtime integration — locally verified
+
+**Status: Passed locally on 2026-11-05 using the existing framework implementation. No framework source files were changed for this verification.**
+
+Developer environment and setup:
+
+- [x] PostgreSQL Server 18.6 installed on Windows and Windows service `postgresql-x64-18` confirmed running.
+- [x] PostgreSQL command-line client verified at `C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe`; `psql --version` reported 18.6. The executable is not currently on Git Bash's PATH, so it was invoked by its full path.
+- [x] PHP's `pdo_pgsql` extension enabled; `PDO::getAvailableDrivers()` includes `pgsql`.
+- [x] Password authentication for the local `postgres` role repaired. A narrowly scoped temporary IPv4 localhost `trust` rule was used only to set a new password, then the backed-up original `pg_hba.conf` was restored and reloaded. A subsequent password-authenticated `psql` connection succeeded; the original SCRAM rules are in place.
+- [x] Dedicated database `civicpulse_test` created, owned by `postgres`, using UTF-8 encoding.
+
+**Actual CivicPulse integration test results:**
+
+The developer ran an inline PHP script from the project root using Composer autoloading and the existing `DatabaseConfig`, `DatabaseManager`, `ConnectionFactory`, `PostgreSqlDriver`, and `Connection` classes. Credentials were read from the temporary `CIVICPULSE_PGSQL_PASSWORD` environment variable and the variable was unset after the test.
+
+- [x] Connected driver reported `pgsql`.
+- [x] Server version query returned PostgreSQL 18.6 on x86_64 Windows.
+- [x] Named parameterized SELECT returned the expected message.
+- [x] `DatabaseManager` returned the same cached connection for default and named `pgsql` access.
+- [x] PostgreSQL temporary table created successfully using an identity primary key.
+- [x] Transaction commit persisted the expected row within the test session.
+- [x] An intentional exception caused transaction rollback; the committed row remained and the rolled-back row was absent.
+- [x] Test printed `All PostgreSQL integration tests passed.`
+- [x] Temporary password environment variable was unset after the test.
+
+**Scope and limitations:**
+
+- This verifies local PostgreSQL connection and core operations through the existing CivicPulse classes. It does not establish production readiness, cross-platform support, schema-builder portability, migration behavior, or full PostgreSQL feature compatibility.
+- The test table was temporary and session-scoped; no permanent application table or framework source file was created.
+- The existing `tests/database_connection.php` remains MySQL/MariaDB-specific (for example, it uses `SELECT VERSION()` and `AUTO_INCREMENT`). PostgreSQL was therefore tested with a separate inline script rather than changing the existing shared test.
+- PostgreSQL is locally integration-tested; it is not yet production-verified. No new committed PostgreSQL test script has been added.
 
 ### 5.7 Documentation
 
@@ -672,7 +705,7 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - **Request body:** Keep the raw request body as a string at the HTTP boundary. Parse JSON or form data deliberately based on content type and the needs of a specific feature.
 - **Query strings:** Query parameters are not part of the route path. For example, `/reports?page=2` and `/reports?page=3` should match the same route; the page value is input to filtering/pagination.
 - **Responsibilities:** Request represents incoming HTTP data. Router matches a request to a handler. Application coordinates execution. Controller/application services implement application behavior. Response represents outgoing HTTP data.
-- **Database:** the initial PDO connection foundation is present; MariaDB and SQLite have passed local runtime tests through CivicPulse's connection layer. PostgreSQL's PDO extension is enabled, but its server connection/runtime tests remain pending. Maintain a per-engine support matrix; never equate a driver class or syntax check with runtime or production support.
+- **Database:** the initial PDO connection foundation is present. MariaDB, SQLite, and PostgreSQL 18.6 have passed local runtime tests through CivicPulse's connection layer. PostgreSQL verification used the dedicated `civicpulse_test` database and passed connection, parameterized query, connection caching, temporary-table creation, transaction commit, and rollback. Maintain a per-engine support matrix; never equate a driver class or syntax check with runtime or production support.
 - **Driver families:** relational PDO drivers, document stores, key-value stores, cache, sessions, queues, filesystem/object storage, mail, and logging are distinct adapter families. Define contracts around each family's actual behavior; do not create one universal `DriverInterface` that erases important differences.
 - **User-confirmed driver coverage requirement (2026-11-05):** The user wants CivicPulse to support the full driver/integration scope tracked in the roadmap, not only the currently implemented MySQL/MariaDB, PostgreSQL, and SQLite PDO drivers. This includes the listed relational database options (SQL Server, Oracle, Firebird, Db2, ODBC and conditionally Sybase/FreeTDS), MongoDB/document storage where justified, Redis and other cache/key-value adapters, and the separate session, queue, lock, rate-limit, and related infrastructure adapters. Implement this breadth incrementally, with a distinct contract for each adapter family and a support matrix that distinguishes planned, implemented, syntax-checked, integration-tested, and production-verified. This is a long-term compatibility requirement, not a claim that every vendor is already supported or that every adapter should be implemented before CivicPulse needs it.
 - **Relational coverage:** track MySQL/MariaDB, PostgreSQL, SQLite, SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options individually. Availability depends on PHP extensions, client libraries, operating system, and deployment environment. Prioritize tested and needed engines over an unrealistic promise to support every vendor immediately.
@@ -701,4 +734,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** SQLite PDO runtime support is verified locally, and PHP exposes `mysql`, `pgsql`, and `sqlite` PDO drivers. The developer is installing PostgreSQL Server and command-line tools; after installation, verify the service and CLI, create a dedicated CivicPulse test database, and run real connection, parameterized query, and transaction tests through the existing PostgreSQL driver. Do not mark PostgreSQL runtime-tested until those operations pass. Then continue with environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** MariaDB, SQLite, and PostgreSQL 18.6 have all passed local runtime checks through CivicPulse's current PDO connection layer. The PostgreSQL test used the dedicated `civicpulse_test` database and an inline PHP test; it did not add or change framework source files. Next, inspect the local working tree and current configuration, then proceed with the environment-file loader and service-container integration. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
