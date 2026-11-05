@@ -268,7 +268,7 @@ Implemented behavior:
 
 ### 5.8 Database foundation — implemented locally and verified against MariaDB
 
-Local files added (currently reported as untracked by Git; do not assume they are committed or present on GitHub):
+Database implementation files currently present in the inspected `main` branch and also developed locally:
 
 - `framework/src/Database/Contracts/DatabaseDriverInterface.php`
 - `framework/src/Database/Drivers/MySqlDriver.php`
@@ -308,7 +308,7 @@ Important limitations and verification boundaries:
 - MariaDB is reached through PDO's `pdo_mysql` driver; it does not require a separate `pdo_mariadb` extension.
 - The current database configuration reads process environment variables with `getenv()`. A project environment-file loader has not yet been implemented.
 - The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
-- The current `git status --short` showed `config/`, `framework/src/Database/`, and `tests/database_connection.php` as untracked. Preserve these local files; do not assume they have been committed or pushed.
+- The inspected GitHub `main` branch contains the listed database implementation files. Local uncommitted changes may still differ from the remote branch; verify with `git status --short` and local file inspection before continuing.
 
 **Definition of Done:** the initial PDO database foundation is locally syntax-checked and the MySQL-compatible connection, parameterized query, and connection-cache behavior are verified against MariaDB. PostgreSQL and SQLite runtime support remain unverified.
 
@@ -429,11 +429,18 @@ Relational database adapters to support over time:
 - [ ] SQL Server PDO adapter, subject to `pdo_sqlsrv` availability.
 - [ ] Oracle PDO adapter, subject to `pdo_oci` availability.
 - [ ] Firebird PDO adapter, subject to `pdo_firebird` availability.
-- [ ] Driver capability detection and clear missing-extension errors.
-- [ ] Additional adapters only where a real use case justifies them.
+- [ ] IBM Db2 adapter, subject to the supported PDO/ODBC extension and client libraries.
+- [ ] Generic PDO_ODBC adapter for supported ODBC data sources, with explicit DSN and capability limitations.
+- [ ] Evaluate Sybase/FreeTDS (`pdo_dblib`) only if a real deployment or integration requires it.
+- [ ] Driver capability detection, extension checks, clear missing-extension errors, and platform compatibility checks.
+- [ ] A documented support matrix recording each adapter's status: planned, implemented, syntax-checked, integration-tested, or production-verified.
+- [ ] Additional adapters only where a real use case justifies them; do not claim universal support for every database engine.
 
 Database capabilities:
 
+- [ ] Driver registry/factory design that can add adapters without a growing, fragile conditional block.
+- [ ] Consistent configuration schema and connection options with driver-specific validation.
+- [ ] Explicit driver capability metadata (transactions, savepoints, returning/insert IDs, JSON, schemas, SSL, and other engine-specific features).
 - [ ] Multiple named connections and lifecycle management hardening.
 - [ ] Connection health checks, reconnect policy, timeouts, and safe failure handling.
 - [ ] Read/write connection separation and read-replica routing.
@@ -447,16 +454,29 @@ Database capabilities:
 
 ### Milestone 5 — Non-relational data stores, cache, and queues
 
-- [ ] Separate key-value/cache store contract.
-- [ ] Redis adapter for cache, rate-limit counters, distributed locks, and suitable ephemeral data.
-- [ ] In-memory cache adapter for local development and tests.
-- [ ] Optional database-backed cache adapter.
-- [ ] Session storage adapters where appropriate.
-- [ ] MongoDB/document-store adapter behind a separate document-database contract if product requirements justify it.
-- [ ] Queue contract and first queue backend; Redis may be used as a backend, but queue semantics remain a separate service.
-- [ ] Cache invalidation, TTL, serialization, and failure behavior tests.
+**Key-value/cache drivers:**
 
-Redis is not a relational database driver. It is a key-value data store that should be integrated through cache, queue, session, lock, and rate-limit contracts rather than pretending it supports PDO SQL operations.
+- [ ] Define a cache contract around get, set, delete, has, TTL/expiration, and clear operations where appropriate.
+- [ ] In-memory adapter for tests and local development.
+- [ ] Redis adapter for production cache, counters, distributed locks, rate-limit state, and queue backend use.
+- [ ] Memcached adapter if a real deployment requires it.
+- [ ] Optional database-backed cache adapter.
+- [ ] Cache prefixing, serialization rules, atomic operations, TTL behavior, and cache-stampede protection where needed.
+
+**Other data-store drivers:**
+
+- [ ] MongoDB/document-store adapter behind a separate document-database contract if product requirements justify it.
+- [ ] Evaluate other document, search, or wide-column stores only against a concrete product requirement; do not force them into the SQL connection interface.
+
+**Sessions and queues:**
+
+- [ ] Session store contract and file, database, and Redis adapters where appropriate.
+- [ ] Queue contract covering dispatch, reservation, acknowledgement, retry, delay, failure, and dead-letter behavior.
+- [ ] In-memory/synchronous queue for tests and development.
+- [ ] Redis-backed queue adapter; consider database-backed queues when useful.
+- [ ] Cache invalidation, TTL, serialization, atomicity, concurrency, and failure behavior tests.
+
+Redis is not a relational database driver. It is a key-value store. Reuse a Redis connection/client adapter where sensible, but expose separate cache, lock, session, rate-limit, and queue contracts because their semantics and reliability requirements differ.
 
 ### Milestone 6 — Schema, migrations, and CivicPulse persistence
 
@@ -498,7 +518,22 @@ The CLI is a framework subsystem, not a database driver. It should invoke framew
 - [ ] Password hashing, authentication, authorization, and policies.
 - [ ] Input validation, upload validation, and security-focused tests.
 
-The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive should generate a real hidden form field, while middleware validates the submitted token.
+The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive should generate a real hidden form field, while middleware validates the submitted token. Template directives must compile to explicit, testable behavior; they must not bypass escaping, authorization, or request validation.
+
+**Planned template syntax / developer shortcuts (Laravel-inspired in ergonomics, independently designed and implemented):**
+
+- [ ] `@csrf` — render the hidden CSRF token field.
+- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.
+- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
+- [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
+- [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials.
+- [ ] `@auth`, `@guest`, and role/permission directives only after authentication and authorization services exist.
+- [ ] `@error` and validation-error helpers after the validation and form-error contracts exist.
+- [ ] Escaped output by default, with an explicit and carefully controlled raw-output escape hatch.
+- [ ] Compile templates to cached PHP safely; invalidate compiled templates when source changes in development.
+- [ ] Tests for directive parsing, malformed directives, nested blocks, escaping, and generated output.
+
+**Other framework shortcuts and APIs to evaluate after the underlying services are stable:** named route URL generation, redirect helpers, request input helpers, response/JSON/download helpers, configuration and environment access, session/flash helpers, validation helpers, authorization checks, and dependency resolution. These should be thin, documented entry points over real framework services—not hidden global state or magic that makes behavior difficult to trace.
 
 ### Milestone 10 — Traffic management, rate limiting, and load balancing
 
@@ -543,6 +578,17 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - [ ] Multi-instance deployment and infrastructure health checks.
 - [ ] Operational and developer documentation.
 
+### Milestone 14 — Framework developer experience and expressive APIs
+
+- [ ] Stable application bootstrap and a clear public framework API.
+- [ ] CLI command shortcuts for common operations (for example, migration, seeding, cache clearing, route listing, and environment diagnostics).
+- [ ] Consistent helper APIs for route URLs, redirects, request access, responses, configuration, sessions, validation, and authorization.
+- [ ] Template engine with a documented directive syntax and safe compilation/caching.
+- [ ] Optional facade-style access only if it remains testable, explicit, and does not obscure dependencies.
+- [ ] Developer error pages in local mode and safe, non-sensitive error responses in production.
+- [ ] Framework documentation covering setup, configuration, supported drivers, extension contracts, and examples.
+- [ ] Compatibility tests for public APIs and documented shortcuts so syntax does not change unexpectedly.
+
 
 ---
 
@@ -553,7 +599,11 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - **Request body:** Keep the raw request body as a string at the HTTP boundary. Parse JSON or form data deliberately based on content type and the needs of a specific feature.
 - **Query strings:** Query parameters are not part of the route path. For example, `/reports?page=2` and `/reports?page=3` should match the same route; the page value is input to filtering/pagination.
 - **Responsibilities:** Request represents incoming HTTP data. Router matches a request to a handler. Application coordinates execution. Controller/application services implement application behavior. Response represents outgoing HTTP data.
-- **Database:** the initial PDO connection foundation is implemented locally and MariaDB-tested. PostgreSQL and SQLite connection classes exist locally but need runtime verification after their PHP PDO extensions are enabled. The architecture is intended to support multiple relational engines through adapters; non-relational stores such as Redis and MongoDB require separate contracts.
+- **Database:** the initial PDO connection foundation is present in the inspected repository and MariaDB-tested according to the recorded local test output. PostgreSQL and SQLite connection classes need runtime verification after their PDO extensions are enabled. Maintain a support matrix; never equate a driver class or syntax check with runtime or production support.
+- **Driver families:** relational PDO drivers, document stores, key-value stores, cache, sessions, queues, filesystem/object storage, mail, and logging are distinct adapter families. Define contracts around each family's actual behavior; do not create one universal `DriverInterface` that erases important differences.
+- **Relational coverage:** track MySQL/MariaDB, PostgreSQL, SQLite, SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options individually. Availability depends on PHP extensions, client libraries, operating system, and deployment environment. Prioritize tested and needed engines over an unrealistic promise to support every vendor immediately.
+- **Redis:** use it as a key-value backend through separate cache, queue, session, lock, and rate-limit services. Do not implement Redis as a PDO SQL driver.
+- **Template shortcuts:** directives such as `@csrf` are compiled template syntax backed by real CSRF/session/middleware services. Convenience syntax must never replace the security mechanism underneath it.
 - **Framework scope:** Build only what the application needs, while keeping the components reusable and understandable.
 
 ---
@@ -577,4 +627,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Harden and test the local multi-driver database foundation before expanding it. Inspect the actual local implementations, add focused tests for driver aliases, unsupported drivers, missing PDO extensions, invalid configuration, named connections, and transaction behavior. Then enable and verify PostgreSQL/SQLite where practical. After that, implement environment configuration and the service container integration. Keep the wider framework roadmap in section 7: additional relational adapters, Redis/cache/queue/session stores, CLI tools, CSRF with a real `@csrf` template directive, rate limiting, application/database load balancing, and production observability. Do not mark planned subsystems as implemented until they are built and tested.
+**Current next action:** Verify the current local working tree against the inspected `main` branch, then harden and test the existing multi-driver database foundation before expanding it. Add focused tests for driver aliases, unsupported drivers, missing PDO extensions, invalid configuration, named connections, and transaction behavior. Then enable and verify PostgreSQL/SQLite where practical. After that, implement environment configuration and service-container integration. The expanded roadmap now explicitly tracks relational engine coverage (including SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options), separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
