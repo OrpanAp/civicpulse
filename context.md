@@ -132,6 +132,8 @@ civicpulse/
 ├── routes/
 ├── storage/
 ├── tests/
+├── .env.example
+├── .gitignore
 ├── composer.json
 └── README.md
 ```
