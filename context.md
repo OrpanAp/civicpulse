@@ -493,14 +493,50 @@ Database capabilities:
 
 Redis is not a relational database driver. It is a key-value store. Reuse a Redis connection/client adapter where sensible, but expose separate cache, lock, session, rate-limit, and queue contracts because their semantics and reliability requirements differ.
 
-### Milestone 6 — Schema, migrations, and CivicPulse persistence
+### Milestone 6 — Schema builder, migrations, models, and CivicPulse persistence
 
-- [ ] Migration interface, runner, and migration tracking.
-- [ ] Per-engine schema grammar for supported relational engines.
-- [ ] Initial schema for users, reports, categories, locations, and report status history.
-- [ ] Seeders for local development data.
-- [ ] Deliberate repository/model pattern driven by actual report use cases.
-- [ ] Database-backed integration tests.
+**Schema definition and fluent column API**
+
+- [ ] Design a fluent schema/blueprint API for defining tables and columns in migrations.
+- [ ] Support column types appropriate to supported engines: string/char/text, integer/big integer, boolean, decimal/float, date/time/timestamp, JSON, UUID, binary, and engine-specific types where needed.
+- [ ] Support chainable column constraints/modifiers such as nullable, default, unsigned where supported, unique, index, primary key, auto-increment/identity, length/precision/scale, comment, and foreign-key references.
+- [ ] Support table operations: create, alter, rename, drop, indexes, composite indexes, unique constraints, foreign keys, and constraint removal.
+- [ ] Provide explicit fluent APIs with predictable semantics, for example: `$table->string('title', 180)->nullable()->unique()`, `$table->foreignId('user_id')->constrained('users')`, and `$table->timestamps()`.
+- [ ] Keep schema definitions separate from model classes: migrations/schema builders describe storage; models describe application data and behavior. Do not make a model itself ambiguously act as a table blueprint.
+- [ ] Compile schema operations through per-engine grammar/adapters. Detect unsupported features and fail clearly rather than silently emitting incorrect SQL.
+- [ ] Test generated SQL and actual schema behavior separately for each supported relational engine.
+
+**Migration system**
+
+- [ ] Migration base contract/class and timestamped migration files with `up()` and `down()`.
+- [ ] Migration repository/table that records applied migration identifiers, batches, and execution order.
+- [ ] Commands for status, migrate, rollback, reset, refresh, and fresh rebuild, with destructive operations clearly confirmed/guarded.
+- [ ] Batch-aware rollback, targeted steps, transactions where the database supports transactional DDL, and documented behavior where it does not.
+- [ ] Concurrency protection so two deploy processes cannot apply the same migration simultaneously.
+- [ ] Migration discovery, deterministic ordering, failure reporting, and recovery guidance.
+- [ ] Database-specific schema grammars and integration tests for supported engines.
+
+**Models and data mapping**
+
+- [ ] A base Model with explicit table/primary-key configuration, attributes, safe hydration, inserts, updates, deletes, refresh, and serialization.
+- [ ] Query API for common filtering, ordering, limits, pagination, aggregates, and parameterized conditions.
+- [ ] Mass-assignment allowlists/guarding, attribute casts, timestamps, hidden/visible fields, and predictable null handling.
+- [ ] Relationships needed by CivicPulse: belongs-to, has-one, has-many, and many-to-many, with explicit foreign/local keys.
+- [ ] Eager loading and protection against accidental N+1 query patterns.
+- [ ] Query scopes, model lifecycle events/hooks, soft deletes where justified, and optimistic/concurrency controls where needed.
+- [ ] Model factories for repeatable test data, separate from production seeders.
+- [ ] Avoid implementing a large ORM surface before the initial CivicPulse reporting workflow proves which features are needed.
+
+**Seeders and test data**
+
+- [ ] Seeder contract/base class and deterministic seeder runner.
+- [ ] Seeder ordering/dependencies and idempotency strategy.
+- [ ] Development seeders for report categories, sample users/roles, and representative civic reports.
+- [ ] Separate safe production/reference-data seeding from destructive demo/test data.
+- [ ] Model factories and database reset helpers for isolated tests.
+- [ ] Database-backed integration tests for migrations, models, relationships, seeders, rollback, and constraints.
+
+**Initial CivicPulse schema:** users, roles/permissions as required, report categories, reports, normalized location data where appropriate, report evidence metadata, report status history, assignments, and audit events. Finalize fields and constraints from actual reporting workflows rather than guessing a generic schema.
 
 ### Milestone 7 — First complete CivicPulse reporting workflow
 
@@ -593,15 +629,37 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - [ ] Multi-instance deployment and infrastructure health checks.
 - [ ] Operational and developer documentation.
 
-### Milestone 14 — Framework developer experience and expressive APIs
+### Milestone 14 — Framework developer experience, resource generators, and expressive APIs
+
+**Resource/component configuration and generators**
+
+- [ ] Build a configurable scaffolding/generator system so developers can create a resource and its related components consistently instead of manually creating disconnected files.
+- [ ] Provide focused commands such as `make:resource`, `make:model`, `make:migration`, `make:seeder`, `make:factory`, `make:controller`, `make:middleware`, `make:request`/form-request, `make:policy`, and `make:event` where the corresponding subsystem exists.
+- [ ] Support generator options to create related files together (for example, a resource with model, migration, seeder, factory, controller, validation/request class, policy, and route registration) while allowing each component to be generated independently.
+- [ ] Provide configurable resource presets/profiles, naming conventions, namespaces, directory paths, table names, primary keys, timestamps, soft deletes, API/web mode, and selected components.
+- [ ] Make generated files valid, minimal, documented, PSR-4-compatible, and consistent with the actual framework APIs; never generate placeholder methods that pretend to work.
+- [ ] Preview planned files and detect collisions before writing; require an explicit force/overwrite option for existing files.
+- [ ] Keep generator templates and defaults configurable without allowing project settings to bypass validation or security.
+- [ ] Add tests for command arguments/options, naming and namespace resolution, generated file contents, collisions, and end-to-end generated resource behavior.
+
+**Fluent schema and model developer APIs**
+
+- [ ] Provide a readable migration schema DSL, for example `Schema::create('tasks', function (Blueprint $table): void { $table->string('title', 180)->nullable()->unique(); $table->timestamps(); });`.
+- [ ] Provide a coherent model API for querying and manipulating records, while keeping model behavior distinct from schema/migration definitions.
+- [ ] Support declarative model configuration for table, primary key, casts, fillable/guarded attributes, timestamps, relationships, and serialization.
+- [ ] Add relationship and query conveniences only when backed by tested query behavior and explicit database portability rules.
+- [ ] Document the API contract and maintain compatibility tests so fluent chains do not change unexpectedly.
+
+**Framework command line and shortcuts**
 
 - [ ] Stable application bootstrap and a clear public framework API.
-- [ ] CLI command shortcuts for common operations (for example, migration, seeding, cache clearing, route listing, and environment diagnostics).
+- [ ] CLI command kernel, registry, help, arguments/options, exit codes, and safe console output.
+- [ ] Commands for migrations, seeders, factories, resource generation, cache operations, route listing, and environment diagnostics.
 - [ ] Consistent helper APIs for route URLs, redirects, request access, responses, configuration, sessions, validation, and authorization.
 - [ ] Template engine with a documented directive syntax and safe compilation/caching.
 - [ ] Optional facade-style access only if it remains testable, explicit, and does not obscure dependencies.
 - [ ] Developer error pages in local mode and safe, non-sensitive error responses in production.
-- [ ] Framework documentation covering setup, configuration, supported drivers, extension contracts, and examples.
+- [ ] Framework documentation covering setup, configuration, supported drivers, extension contracts, generators, and examples.
 - [ ] Compatibility tests for public APIs and documented shortcuts so syntax does not change unexpectedly.
 
 
@@ -614,7 +672,7 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - **Request body:** Keep the raw request body as a string at the HTTP boundary. Parse JSON or form data deliberately based on content type and the needs of a specific feature.
 - **Query strings:** Query parameters are not part of the route path. For example, `/reports?page=2` and `/reports?page=3` should match the same route; the page value is input to filtering/pagination.
 - **Responsibilities:** Request represents incoming HTTP data. Router matches a request to a handler. Application coordinates execution. Controller/application services implement application behavior. Response represents outgoing HTTP data.
-- **Database:** the initial PDO connection foundation is present in the inspected repository and MariaDB-tested according to the recorded local test output. PostgreSQL and SQLite connection classes need runtime verification after their PDO extensions are enabled. Maintain a support matrix; never equate a driver class or syntax check with runtime or production support.
+- **Database:** the initial PDO connection foundation is present; MariaDB and SQLite have passed local runtime tests through CivicPulse's connection layer. PostgreSQL's PDO extension is enabled, but its server connection/runtime tests remain pending. Maintain a per-engine support matrix; never equate a driver class or syntax check with runtime or production support.
 - **Driver families:** relational PDO drivers, document stores, key-value stores, cache, sessions, queues, filesystem/object storage, mail, and logging are distinct adapter families. Define contracts around each family's actual behavior; do not create one universal `DriverInterface` that erases important differences.
 - **User-confirmed driver coverage requirement (2026-11-05):** The user wants CivicPulse to support the full driver/integration scope tracked in the roadmap, not only the currently implemented MySQL/MariaDB, PostgreSQL, and SQLite PDO drivers. This includes the listed relational database options (SQL Server, Oracle, Firebird, Db2, ODBC and conditionally Sybase/FreeTDS), MongoDB/document storage where justified, Redis and other cache/key-value adapters, and the separate session, queue, lock, rate-limit, and related infrastructure adapters. Implement this breadth incrementally, with a distinct contract for each adapter family and a support matrix that distinguishes planned, implemented, syntax-checked, integration-tested, and production-verified. This is a long-term compatibility requirement, not a claim that every vendor is already supported or that every adapter should be implemented before CivicPulse needs it.
 - **Relational coverage:** track MySQL/MariaDB, PostgreSQL, SQLite, SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options individually. Availability depends on PHP extensions, client libraries, operating system, and deployment environment. Prioritize tested and needed engines over an unrealistic promise to support every vendor immediately.
@@ -643,4 +701,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** SQLite PDO runtime support is now verified locally, and PHP permanently exposes all three PDO drivers (`mysql`, `pgsql`, and `sqlite`). Determine whether a PostgreSQL Windows service/server is installed; if available, connect through CivicPulse's existing PostgreSQL driver and run representative query and transaction tests. If no server is installed, decide whether to install PostgreSQL or defer its runtime verification. Do not mark PostgreSQL runtime-tested until a real connection and representative operations pass. Afterward, implement environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The expanded roadmap also tracks additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
+**Current next action:** SQLite PDO runtime support is verified locally, and PHP exposes `mysql`, `pgsql`, and `sqlite` PDO drivers. The developer is installing PostgreSQL Server and command-line tools; after installation, verify the service and CLI, create a dedicated CivicPulse test database, and run real connection, parameterized query, and transaction tests through the existing PostgreSQL driver. Do not mark PostgreSQL runtime-tested until those operations pass. Then continue with environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
