@@ -266,9 +266,9 @@ Implemented behavior:
 - [x] GET `/` returns a CivicPulse JSON health/landing response.
 - [x] GET `/reports` returns an explicitly empty, not-yet-persisted reports response.
 
-### 5.8 Database foundation — implemented locally and verified against MariaDB
+### 5.8 Database foundation — initial implementation present remotely; hardening changes verified locally
 
-Database implementation files currently present in the inspected `main` branch and also developed locally:
+The initial database implementation files are present in the inspected `main` branch. The hardening changes and new test scripts described below are currently **local and uncommitted**; they have not been pushed to GitHub.
 
 - `framework/src/Database/Contracts/DatabaseDriverInterface.php`
 - `framework/src/Database/Drivers/MySqlDriver.php`
@@ -288,9 +288,11 @@ Implemented locally:
 - [x] Dynamic driver selection through `ConnectionFactory`.
 - [x] Driver aliases for `mysql`, `mariadb`, `pgsql`, `postgres`, `postgresql`, and `sqlite`.
 - [x] A `Connection` wrapper for parameterized select, select-one, scalar, statement, inserted-ID retrieval, and transaction operations.
-- [x] Configuration validation through `DatabaseConfig`.
+- [x] Configuration validation through `DatabaseConfig`, including safe validation order, default connection existence, array connection definitions, and non-empty string driver names (local hardening change; tests passed).
 - [x] Named connection resolution and connection caching through `DatabaseManager`.
 - [x] Configuration-driven default connection settings in `config/database.php`.
+- [x] Transaction commit and rollback behavior verified against MariaDB.
+- [x] Nested transaction rejection verified; nested transactions remain intentionally unsupported.
 
 Developer environment and verification:
 
@@ -298,9 +300,20 @@ Developer environment and verification:
 - [x] The `pdo_mysql` extension is available.
 - [x] The MariaDB server responds with version `10.4.32-MariaDB`.
 - [x] All ten database PHP files passed `php -l`.
-- [x] `php tests/database_connection.php` passed against the real MariaDB server.
-- [x] Parameterized query test passed.
-- [x] Connection caching test passed.
+- [x] `php tests/database_connection.php` passed against the real MariaDB server, including parameterized queries, connection caching, transaction commit, nested-transaction rejection, and rollback.
+- [x] `php tests/database_config.php` passed all eight configuration checks, including invalid and valid configurations.
+- [x] `php tests/database_factory.php` passed unsupported-driver handling, PostgreSQL alias/missing-extension checks, SQLite missing-extension handling, and real MySQL/MariaDB alias connections.
+- [x] `git diff --check` reported no whitespace errors for the local changes.
+- [ ] Commit/push the verified local hardening and test scripts after final review.
+
+Local test files currently added or modified:
+- Modified: `framework/src/Database/DatabaseConfig.php`
+- Modified: `tests/database_connection.php`
+- Added: `tests/database_config.php`
+- Added: `tests/database_factory.php`
+- Added: `tests/setup_test_database.php` (local test utility that creates the `civicpulse_test` database; it uses local development credentials and must be reviewed before any commit).
+
+The connection integration test currently overrides the MySQL test connection to use the dedicated `civicpulse_test` database. The test database setup utility was run successfully. The developer's environment uses a local MariaDB account with username `root` and an empty password; do not assume those credentials are portable or suitable for shared/production environments.
 
 Important limitations and verification boundaries:
 
@@ -310,7 +323,7 @@ Important limitations and verification boundaries:
 - The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
 - The inspected GitHub `main` branch contains the listed database implementation files. Local uncommitted changes may still differ from the remote branch; verify with `git status --short` and local file inspection before continuing.
 
-**Definition of Done:** the initial PDO database foundation is locally syntax-checked and the MySQL-compatible connection, parameterized query, and connection-cache behavior are verified against MariaDB. PostgreSQL and SQLite runtime support remain unverified.
+**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have all passed their respective local test scripts. PostgreSQL and SQLite runtime support remain unverified. The hardening changes and test files are still uncommitted locally; the remote repository does not yet contain them.
 
 ### 5.7 Documentation
 
@@ -627,4 +640,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Verify the current local working tree against the inspected `main` branch, then harden and test the existing multi-driver database foundation before expanding it. Add focused tests for driver aliases, unsupported drivers, missing PDO extensions, invalid configuration, named connections, and transaction behavior. Then enable and verify PostgreSQL/SQLite where practical. After that, implement environment configuration and service-container integration. The expanded roadmap now explicitly tracks relational engine coverage (including SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options), separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
+**Current next action:** Review the local database hardening diff and test utilities, especially the dedicated test database configuration and setup script. Then run final syntax checks and the complete database test scripts, commit/push the verified local source and test changes when the developer chooses, and synchronize the remote tracker with that commit. After the local changes are safely committed, enable and runtime-test PostgreSQL/SQLite where practical. Then implement environment configuration and service-container integration. The expanded roadmap now explicitly tracks relational engine coverage (including SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options), separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
