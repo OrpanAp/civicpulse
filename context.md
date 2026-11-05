@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-05  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — framework foundations exist; the browser application is not running yet.
+**Project status:** Early development — HTTP lifecycle and an initial multi-driver PDO database foundation have been implemented and locally verified. CivicPulse report persistence is not yet connected.
 
 ---
 
@@ -266,6 +266,52 @@ Implemented behavior:
 - [x] GET `/` returns a CivicPulse JSON health/landing response.
 - [x] GET `/reports` returns an explicitly empty, not-yet-persisted reports response.
 
+### 5.8 Database foundation — implemented locally and verified against MariaDB
+
+Local files added (currently reported as untracked by Git; do not assume they are committed or present on GitHub):
+
+- `framework/src/Database/Contracts/DatabaseDriverInterface.php`
+- `framework/src/Database/Drivers/MySqlDriver.php`
+- `framework/src/Database/Drivers/PostgreSqlDriver.php`
+- `framework/src/Database/Drivers/SQLiteDriver.php`
+- `framework/src/Database/Connection.php`
+- `framework/src/Database/ConnectionFactory.php`
+- `framework/src/Database/DatabaseConfig.php`
+- `framework/src/Database/DatabaseManager.php`
+- `config/database.php`
+- `tests/database_connection.php`
+
+Implemented locally:
+
+- [x] A common `DatabaseDriverInterface` contract.
+- [x] PDO connection implementations for MySQL/MariaDB, PostgreSQL, and SQLite.
+- [x] Dynamic driver selection through `ConnectionFactory`.
+- [x] Driver aliases for `mysql`, `mariadb`, `pgsql`, `postgres`, `postgresql`, and `sqlite`.
+- [x] A `Connection` wrapper for parameterized select, select-one, scalar, statement, inserted-ID retrieval, and transaction operations.
+- [x] Configuration validation through `DatabaseConfig`.
+- [x] Named connection resolution and connection caching through `DatabaseManager`.
+- [x] Configuration-driven default connection settings in `config/database.php`.
+
+Developer environment and verification:
+
+- [x] PHP PDO is enabled.
+- [x] The `pdo_mysql` extension is available.
+- [x] The MariaDB server responds with version `10.4.32-MariaDB`.
+- [x] All ten database PHP files passed `php -l`.
+- [x] `php tests/database_connection.php` passed against the real MariaDB server.
+- [x] Parameterized query test passed.
+- [x] Connection caching test passed.
+
+Important limitations and verification boundaries:
+
+- PostgreSQL and SQLite driver files passed PHP syntax checks, but their actual connections have not been tested because the current PHP installation exposes only the `mysql` PDO driver.
+- MariaDB is reached through PDO's `pdo_mysql` driver; it does not require a separate `pdo_mariadb` extension.
+- The current database configuration reads process environment variables with `getenv()`. A project environment-file loader has not yet been implemented.
+- The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
+- The current `git status --short` showed `config/`, `framework/src/Database/`, and `tests/database_connection.php` as untracked. Preserve these local files; do not assume they have been committed or pushed.
+
+**Definition of Done:** the initial PDO database foundation is locally syntax-checked and the MySQL-compatible connection, parameterized query, and connection-cache behavior are verified against MariaDB. PostgreSQL and SQLite runtime support remain unverified.
+
 ### 5.7 Documentation
 
 - [x] `README.md` created and committed.
@@ -350,90 +396,153 @@ php -S localhost:8000 -t public public/router.php
 
 ---
 
-## 7. Later Milestones — Product-Driven Framework Roadmap
+## 7. Expanded Framework and CivicPulse Roadmap
 
-These are ordered broadly by dependency. Do not start them before the browser lifecycle milestone is complete.
+These are planned capabilities, not claims of implementation. Build each subsystem behind a clear contract, then verify a complete working path before checking it off. Avoid building every possible adapter before CivicPulse needs it.
 
-### Milestone 2 — Framework application foundation
+### Milestone 2 — Application foundation and configuration
 
 - [ ] Dependency injection / service container.
-- [ ] Application configuration.
-- [ ] Environment configuration and safe secret handling.
+- [ ] Application configuration and configuration access.
+- [ ] Environment-file loader, safe secret handling, and environment validation.
 - [ ] Centralized exception handling and error responses.
-- [ ] A proper automated test structure.
+- [ ] A consistent automated test structure.
 
-### Milestone 3 — Middleware and request pipeline
+### Milestone 3 — Middleware and HTTP request pipeline
 
-- [ ] Middleware contract.
-- [ ] Middleware pipeline / dispatcher.
-- [ ] Request logging.
-- [ ] Security-related middleware.
-- [ ] Authentication middleware when authentication is introduced.
+- [ ] Middleware contract and pipeline/dispatcher.
+- [ ] Middleware registration and ordering.
+- [ ] Request logging and correlation/request IDs.
+- [ ] Security headers and trusted-proxy handling.
+- [ ] Session abstraction and session middleware.
+- [ ] Authentication and authorization middleware when those features are introduced.
 
-### Milestone 4 — Database foundation
+### Milestone 4 — Extensible database and storage foundation
 
-- [ ] Choose and configure PostgreSQL for the application.
-- [ ] Database connection management using PDO.
-- [ ] Configuration-driven connection settings.
-- [ ] Safe parameterized queries.
-- [ ] Query builder for the needs of CivicPulse.
-- [ ] Database integration tests.
+**Initial local implementation:** PDO MySQL/MariaDB, PostgreSQL, and SQLite drivers, common driver contract, connection factory, configuration, manager, connection wrapper. MariaDB connection and basic operations have passed local tests. See section 5.8.
 
-### Milestone 5 — Schema and persistence
+Relational database adapters to support over time:
 
-- [ ] Migration interface and runner.
-- [ ] Migration tracking.
+- [x] MySQL/MariaDB PDO driver implementation (MariaDB runtime-tested).
+- [ ] PostgreSQL PDO runtime verification after enabling `pdo_pgsql`.
+- [ ] SQLite PDO runtime verification after enabling `pdo_sqlite`.
+- [ ] SQL Server PDO adapter, subject to `pdo_sqlsrv` availability.
+- [ ] Oracle PDO adapter, subject to `pdo_oci` availability.
+- [ ] Firebird PDO adapter, subject to `pdo_firebird` availability.
+- [ ] Driver capability detection and clear missing-extension errors.
+- [ ] Additional adapters only where a real use case justifies them.
+
+Database capabilities:
+
+- [ ] Multiple named connections and lifecycle management hardening.
+- [ ] Connection health checks, reconnect policy, timeouts, and safe failure handling.
+- [ ] Read/write connection separation and read-replica routing.
+- [ ] Parameter binding rules and portable query operations.
+- [ ] Database-specific SQL grammars for query building and schema operations.
+- [ ] Query builder based on CivicPulse report/user workflows.
+- [ ] Transaction behavior, including an explicit strategy for nested transactions/savepoints.
+- [ ] Database integration tests for each available engine.
+
+**Portability rule:** a shared connection contract does not make every SQL statement portable. Engine-specific syntax and capabilities must be isolated in driver/grammar adapters. PDO-based SQL databases and non-SQL stores must not be forced into one misleading interface.
+
+### Milestone 5 — Non-relational data stores, cache, and queues
+
+- [ ] Separate key-value/cache store contract.
+- [ ] Redis adapter for cache, rate-limit counters, distributed locks, and suitable ephemeral data.
+- [ ] In-memory cache adapter for local development and tests.
+- [ ] Optional database-backed cache adapter.
+- [ ] Session storage adapters where appropriate.
+- [ ] MongoDB/document-store adapter behind a separate document-database contract if product requirements justify it.
+- [ ] Queue contract and first queue backend; Redis may be used as a backend, but queue semantics remain a separate service.
+- [ ] Cache invalidation, TTL, serialization, and failure behavior tests.
+
+Redis is not a relational database driver. It is a key-value data store that should be integrated through cache, queue, session, lock, and rate-limit contracts rather than pretending it supports PDO SQL operations.
+
+### Milestone 6 — Schema, migrations, and CivicPulse persistence
+
+- [ ] Migration interface, runner, and migration tracking.
+- [ ] Per-engine schema grammar for supported relational engines.
 - [ ] Initial schema for users, reports, categories, locations, and report status history.
-- [ ] Models/repositories or another deliberate persistence pattern.
 - [ ] Seeders for local development data.
+- [ ] Deliberate repository/model pattern driven by actual report use cases.
+- [ ] Database-backed integration tests.
 
-### Milestone 6 — First complete CivicPulse reporting workflow
+### Milestone 7 — First complete CivicPulse reporting workflow
 
 Build a real end-to-end vertical slice:
 
-- [ ] Define the report data model and lifecycle.
+- [ ] Define report data model and lifecycle.
 - [ ] Validate a submitted report.
 - [ ] Store a report and its location.
 - [ ] Expose report details and a report listing.
 - [ ] Handle expected errors and invalid input.
 - [ ] Test the workflow against a real test database.
 
-A complete vertical slice is more important than implementing a large number of generic framework features.
+### Milestone 8 — Console / CLI tools
 
-### Milestone 7 — Trust, verification, and duplicate handling
+- [ ] Console kernel and command registry.
+- [ ] Command signature, arguments, options, and help output.
+- [ ] Clear exit codes and formatted console output.
+- [ ] Commands for migrations, seeders, cache operations, and application diagnostics.
+- [ ] Scheduled-task integration only when a concrete operational need exists.
+
+The CLI is a framework subsystem, not a database driver. It should invoke framework services through the same application/container architecture.
+
+### Milestone 9 — Security, sessions, and form protection
+
+- [ ] Secure session abstraction and configurable session storage.
+- [ ] CSRF token generation, storage, validation, and rotation policy.
+- [ ] CSRF middleware for state-changing requests.
+- [ ] Safe template directive such as `@csrf` that renders a hidden CSRF token input.
+- [ ] Output escaping by default in the view/template system.
+- [ ] Password hashing, authentication, authorization, and policies.
+- [ ] Input validation, upload validation, and security-focused tests.
+
+The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive should generate a real hidden form field, while middleware validates the submitted token.
+
+### Milestone 10 — Traffic management, rate limiting, and load balancing
+
+- [ ] Rate-limiter contract with configurable limits and windows.
+- [ ] In-memory limiter for tests and single-process development.
+- [ ] Redis-backed distributed limiter for multiple application instances.
+- [ ] Per-IP, per-user, and per-route policies with trusted-proxy safeguards.
+- [ ] HTTP throttling middleware and correct 429 responses/headers.
+- [ ] Application-level read/write database routing.
+- [ ] Health checks, failure detection, and configurable failover.
+- [ ] Reverse-proxy/load-balancer deployment support and trusted forwarded headers.
+- [ ] Observability for rejected requests, database health, and routing decisions.
+
+Load balancing must be treated at the correct layer: a reverse proxy/load balancer distributes HTTP traffic across application instances; database read/write splitting distributes database operations. These are related but distinct systems. Avoid implementing a custom network load balancer when mature infrastructure such as Nginx, HAProxy, or a cloud load balancer is the appropriate tool.
+
+### Milestone 11 — Trust, verification, and operational workflow
 
 - [ ] Report review and verification states.
 - [ ] Similar-report detection strategy.
 - [ ] Duplicate grouping and linking.
 - [ ] Preserve individual citizen submissions while linking them to a shared issue where appropriate.
 - [ ] Audit history for important actions.
-
-### Milestone 8 — Users, roles, and operational workflow
-
-- [ ] Authentication and secure password handling.
-- [ ] Authorization and policies.
 - [ ] Citizen, reviewer, and staff permissions.
-- [ ] Assignment and prioritization.
-- [ ] Status transitions and responsible-party tracking.
+- [ ] Assignment, prioritization, and status transitions.
 
-### Milestone 9 — Public experience and operational features
+### Milestone 12 — Public experience and operational features
 
 - [ ] Evidence/photo upload with validation and safe storage.
 - [ ] Location-based browsing and filtering.
-- [ ] Notifications.
-- [ ] Public issue status pages.
+- [ ] Notifications and public issue status pages.
 - [ ] Administrative views and analytics.
 - [ ] API documentation.
+- [ ] Search and reporting capabilities appropriate to real civic data.
 
-### Milestone 10 — Production readiness
+### Milestone 13 — Production readiness
 
-- [ ] Security review.
-- [ ] Rate limiting and abuse prevention.
-- [ ] Logging and monitoring.
-- [ ] Performance testing.
-- [ ] Backup and recovery strategy.
+- [ ] Security review and threat modelling.
+- [ ] Structured logging, metrics, tracing, and monitoring.
+- [ ] Performance and concurrency testing.
+- [ ] Backup, restore, and disaster-recovery strategy.
 - [ ] Deployment configuration and CI/CD.
-- [ ] Operational documentation.
+- [ ] Multi-instance deployment and infrastructure health checks.
+- [ ] Operational and developer documentation.
+
 
 ---
 
@@ -444,7 +553,7 @@ A complete vertical slice is more important than implementing a large number of 
 - **Request body:** Keep the raw request body as a string at the HTTP boundary. Parse JSON or form data deliberately based on content type and the needs of a specific feature.
 - **Query strings:** Query parameters are not part of the route path. For example, `/reports?page=2` and `/reports?page=3` should match the same route; the page value is input to filtering/pagination.
 - **Responsibilities:** Request represents incoming HTTP data. Router matches a request to a handler. Application coordinates execution. Controller/application services implement application behavior. Response represents outgoing HTTP data.
-- **Database:** PostgreSQL is the intended database direction, but it has not yet been integrated.
+- **Database:** the initial PDO connection foundation is implemented locally and MariaDB-tested. PostgreSQL and SQLite connection classes exist locally but need runtime verification after their PHP PDO extensions are enabled. The architecture is intended to support multiple relational engines through adapters; non-relational stores such as Redis and MongoDB require separate contracts.
 - **Framework scope:** Build only what the application needs, while keeping the components reusable and understandable.
 
 ---
@@ -468,4 +577,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Begin the database foundation for CivicPulse, starting with the PostgreSQL/PDO connection design and configuration requirements. Keep the first persistence work tied to the real report workflow; do not build a generic ORM or query builder before a concrete use case requires it.
+**Current next action:** Harden and test the local multi-driver database foundation before expanding it. Inspect the actual local implementations, add focused tests for driver aliases, unsupported drivers, missing PDO extensions, invalid configuration, named connections, and transaction behavior. Then enable and verify PostgreSQL/SQLite where practical. After that, implement environment configuration and the service container integration. Keep the wider framework roadmap in section 7: additional relational adapters, Redis/cache/queue/session stores, CLI tools, CSRF with a real `@csrf` template directive, rate limiting, application/database load balancing, and production observability. Do not mark planned subsystems as implemented until they are built and tested.
