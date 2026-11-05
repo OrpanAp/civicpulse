@@ -185,15 +185,9 @@ Implemented behavior:
 - [x] Preserves the raw request body through `getBody()`.
 - [x] Provides `createFromGlobals()` to build a request from PHP's request environment.
 
-Known small hardening item: `getallheaders()` can return `false`; normalize its result to an array before passing it to the constructor:
+- [x] Normalizes the result of `getallheaders()` to an array when the function returns `false`.
 
-```php
-$headers = function_exists('getallheaders')
-    ? (getallheaders() ?: [])
-    : [];
-```
-
-This is a small correction, not a reason to delay the next major milestone.
+The Request implementation is integrated with the Router and Application lifecycle.
 
 ### 5.3 Router
 
@@ -201,22 +195,19 @@ File: `framework/src/Routing/Router.php`
 
 Implemented behavior:
 
-- [x] Stores route handlers in a static route registry.
-- [x] Registers GET routes.
-- [x] Registers POST routes.
-- [x] Checks whether a method/path pair is registered.
-- [x] Dispatches a registered handler.
+- [x] Uses an instance-owned route registry.
+- [x] Registers GET and POST routes.
+- [x] Supports direct route registration through `addRoute()`.
+- [x] Normalizes HTTP methods to uppercase during registration and lookup.
+- [x] Dispatches an incoming `Request` object.
+- [x] Passes the Request to the matched handler.
+- [x] Enforces a `Response` return contract for route handlers.
+- [x] Returns HTTP 404 when the path is unknown.
+- [x] Returns HTTP 405 when the path exists but the method is unsupported.
+- [x] Includes the supported methods in the 405 `Allow` header.
+- [x] Keeps routes isolated between Router/Application instances.
 
-Current limitations to address during integration or a deliberate refactor:
-
-- Dispatch currently accepts separate method and path strings, not a Request object.
-- Route handlers are invoked without a Request argument.
-- The return type is `mixed`, not a defined Response contract.
-- Missing routes throw a generic `Exception`.
-- The registry is static, so routes can be shared between tests or application instances.
-- Direct calls to `addRoute()` do not normalize the method.
-
-**Architecture decision still open:** retain the static router for the first working vertical slice, or refactor it to an instance-based router before Application integration. An instance-based router is generally easier to isolate in tests and inject into an Application, but do not silently change the existing design. Explain the trade-off and make one deliberate decision.
+**Architecture decision:** use an instance-based Router. Each Application receives its own Router, avoiding shared static route state and making isolated tests possible. Basic exact-path routing is intentionally implemented before dynamic route parameters or route groups.
 
 ### 5.4 Existing test/check script
 
@@ -244,25 +235,53 @@ string(3) "all"
 
 This is a small foundation check, not a full automated test suite.
 
-### 5.5 Documentation
+### 5.5 HTTP Response
+
+File: `framework/src/Http/Response.php`
+
+Implemented behavior:
+
+- [x] Stores response content, status code, and headers.
+- [x] Validates HTTP status codes and response header names/values.
+- [x] Exposes content, status, and headers for tests.
+- [x] Provides a JSON response helper with safe JSON encoding.
+- [x] Supports optional additional headers in the JSON helper.
+- [x] Sends the HTTP status, headers, and body through `send()`.
+
+### 5.6 Application lifecycle and public entry points
+
+Files:
+
+- `framework/src/Application/Application.php`
+- `public/index.php`
+- `public/router.php`
+- `routes/web.php`
+
+Implemented behavior:
+
+- [x] Application handles a supplied Request and returns a Response.
+- [x] Application runtime entry point creates a Request from PHP globals and sends the Response.
+- [x] Front controller loads Composer autoloading, registers routes, creates Application, and runs it.
+- [x] PHP development-server router forwards non-file paths to the front controller.
+- [x] GET `/` returns a CivicPulse JSON health/landing response.
+- [x] GET `/reports` returns an explicitly empty, not-yet-persisted reports response.
+
+### 5.7 Documentation
 
 - [x] `README.md` created and committed.
-- [ ] Keep this `context.md` updated as the living development handoff and progress tracker.
+- [x] Keep this `context.md` updated as the living development handoff and progress tracker.
 
 ---
 
-## 6. Immediate Next Milestone: Make CivicPulse Run in a Browser
+## 6. Completed Milestone: Browser HTTP Request-to-Response Lifecycle
 
-**Priority: Do this before adding more framework subsystems.**
+**Status: Implemented and locally verified on 2026-11-05.**
 
-The next milestone is a complete HTTP request-to-response lifecycle. At the end, a browser should be able to make a request to the local PHP server, pass through the application, match a route, execute a handler, and receive a real HTTP response.
-
-Target flow:
+The first browser-facing HTTP lifecycle is working:
 
 ```text
 Browser
   |
-  | HTTP request
   v
 public/index.php
   |
@@ -273,104 +292,61 @@ Application
 Router
   |
   v
-Route handler / Controller
+Route handler
   |
   v
 Response
   |
-  | status + headers + body
   v
 Browser
 ```
 
-### Tasks
+### Implemented files
 
-#### 6.1 Implement the Response object
+- `framework/src/Http/Response.php`
+- `framework/src/Routing/Router.php`
+- `framework/src/Application/Application.php`
+- `routes/web.php`
+- `public/index.php`
+- `public/router.php`
+- `tests/http_lifecycle.php`
 
-Target file: `framework/src/Http/Response.php`
+### Local verification reported by the developer
 
-It should represent an outgoing HTTP response and support:
+- [x] `git status --short` returned no output before these checks, indicating a clean working tree at that point.
+- [x] PHP syntax checks passed for all seven implementation/test files.
+- [x] `php tests/http_lifecycle.php` passed all eight assertions.
+- [x] PHP development server started with `php -S localhost:8000 -t public public/router.php`.
+- [x] `GET /` returned HTTP 200 and the CivicPulse JSON response.
+- [x] `GET /reports` returned HTTP 200 and an empty reports payload explicitly stating persistence is not connected.
+- [x] `GET /unknown` returned HTTP 404.
+- [x] `POST /reports` returned HTTP 405 with `Allow: GET`.
+- [x] Separate Application instances were verified to have isolated route registries by the integration test.
 
-- [ ] Response body/content.
-- [ ] HTTP status code.
-- [ ] Response headers.
-- [ ] Accessors for inspecting the response in tests.
-- [ ] A `send()` method that applies the status and headers and writes the body.
-- [ ] A JSON response helper that encodes data safely and sets the JSON content type.
-
-Design principle: constructing a Response should not immediately send headers or print output. Keep response creation separate from sending it.
-
-#### 6.2 Integrate Router with Request and Response
-
-Target file: `framework/src/Routing/Router.php`
-
-- [ ] Decide static versus instance-based router and document why.
-- [ ] Dispatch using the incoming Request.
-- [ ] Pass the Request to route handlers.
-- [ ] Establish a clear handler return contract using Response.
-- [ ] Return a proper 404 response when no route matches.
-- [ ] Ensure HTTP methods are normalized consistently.
-
-Do not add dynamic route parameters, route groups, named routes, or advanced routing features yet. First make basic routes work end-to-end.
-
-#### 6.3 Implement the Application lifecycle
-
-Target file: `framework/src/Application/Application.php`
-
-- [ ] Make Application coordinate the Router and Request.
-- [ ] Provide a testable method that handles a supplied Request and returns a Response.
-- [ ] Provide the runtime entry method that creates a Request from globals and sends the resulting Response.
-- [ ] Keep routing decisions out of the Request class.
-
-#### 6.4 Add the public front controller
-
-Target file: `public/index.php`
-
-- [ ] Load Composer's autoloader.
-- [ ] Create/configure the router.
-- [ ] Load the route definitions.
-- [ ] Create the Application.
-- [ ] Run the Application.
-
-#### 6.5 Register the first CivicPulse routes
-
-Target file: `routes/web.php`
-
-Start with a small but real set of routes:
-
-- [ ] `GET /` — a simple CivicPulse landing/health response.
-- [ ] `GET /reports` — a JSON response representing the reports endpoint (initially empty or clearly marked as not yet connected to persistence).
-
-These are initial integration routes, not the final reporting implementation.
-
-#### 6.6 Run locally and verify
-
-- [ ] Configure PHP's built-in server with the public directory as document root.
-- [ ] Ensure non-file paths such as `/reports` are forwarded to the front controller using a development router script if needed.
-- [ ] Open the root route in a browser.
-- [ ] Request the reports route and inspect its HTTP status, headers, and body.
-- [ ] Verify an unknown path produces a 404 response.
-- [ ] Verify a wrong HTTP method does not accidentally execute another method's handler.
-- [ ] Add automated tests for the Response, Router, and Application behavior.
-
-Suggested local server command once the front controller and development router script exist:
+Commands used:
 
 ```bash
+php -l framework/src/Http/Response.php
+php -l framework/src/Routing/Router.php
+php -l framework/src/Application/Application.php
+php -l routes/web.php
+php -l public/index.php
+php -l public/router.php
+php -l tests/http_lifecycle.php
+
+php tests/http_lifecycle.php
+
 php -S localhost:8000 -t public public/router.php
 ```
 
-The server command is a future step; do not expect it to work until the required files are implemented.
+### Known scope and limitations
 
-### Definition of Done
+- Routing currently supports exact paths only; dynamic parameters, route groups, and named routes are not implemented.
+- The reports endpoint is a placeholder. There is no database connection or persistence yet.
+- The observed JSON content-type and Allow headers were emitted without a space after the colon by PHP's `header()` call. The responses were accepted by the local client; header formatting can be tidied separately without changing the lifecycle design.
+- The built-in PHP server is for local development, not production deployment.
 
-This milestone is complete only when all of the following are true:
-
-- [ ] A request to `http://localhost:8000/` reaches CivicPulse and returns a visible response.
-- [ ] A request to `http://localhost:8000/reports` returns the expected response.
-- [ ] The response has the intended HTTP status and content type.
-- [ ] An unknown route returns HTTP 404.
-- [ ] The behavior is tested, not merely inferred from the code.
-- [ ] This tracker is updated with completed tasks and any remaining limitations.
+**Definition of Done:** the browser lifecycle milestone is complete based on the syntax checks, eight passing integration assertions, and the reported real HTTP responses above.
 
 ---
 
@@ -492,4 +468,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Implement `framework/src/Http/Response.php`, then integrate it with the existing Router and build the Application lifecycle as one working milestone.
+**Current next action:** Begin the database foundation for CivicPulse, starting with the PostgreSQL/PDO connection design and configuration requirements. Keep the first persistence work tied to the real report workflow; do not build a generic ORM or query builder before a concrete use case requires it.
