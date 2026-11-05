@@ -268,7 +268,7 @@ Implemented behavior:
 
 ### 5.8 Database foundation — initial implementation present remotely; hardening changes verified locally
 
-The initial database implementation files are present in the inspected `main` branch. The hardening changes and new test scripts described below are currently **local and uncommitted**; they have not been pushed to GitHub.
+The initial database implementation files are present in the inspected `main` branch. The hardening changes and new test scripts described below were committed and pushed in `d49657c` (`Add multiple test cases for db connections`). The developer has confirmed that local `main` is synchronized with `origin/main` and the working tree is clean.
 
 - `framework/src/Database/Contracts/DatabaseDriverInterface.php`
 - `framework/src/Database/Drivers/MySqlDriver.php`
@@ -304,7 +304,7 @@ Developer environment and verification:
 - [x] `php tests/database_config.php` passed all eight configuration checks, including invalid and valid configurations.
 - [x] `php tests/database_factory.php` passed unsupported-driver handling, PostgreSQL alias/missing-extension checks, SQLite missing-extension handling, and real MySQL/MariaDB alias connections.
 - [x] `git diff --check` reported no whitespace errors for the local changes.
-- [ ] Commit/push the verified local hardening and test scripts after final review.
+- [x] Commit/push the verified local hardening and test scripts after final review (`d49657c`); local `main` is synchronized with `origin/main` and the working tree is clean.
 
 Local test files currently added or modified:
 - Modified: `framework/src/Database/DatabaseConfig.php`
@@ -323,7 +323,7 @@ Important limitations and verification boundaries:
 - The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
 - The inspected GitHub `main` branch contains the listed database implementation files. Local uncommitted changes may still differ from the remote branch; verify with `git status --short` and local file inspection before continuing.
 
-**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have all passed their respective local test scripts. PostgreSQL and SQLite runtime support remain unverified. The hardening changes and test files are still uncommitted locally; the remote repository does not yet contain them.
+**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have all passed their respective local test scripts. PostgreSQL and SQLite runtime support remain unverified. The hardening changes and test files are committed and present in the remote repository at `d49657c`.
 
 ### 5.7 Documentation
 
@@ -640,4 +640,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The local database hardening review and final test run are complete. The developer has verified that `php tests/database_config.php`, `php tests/database_factory.php`, and `php tests/database_connection.php` all pass, and `git diff --check` reports no whitespace errors. The working tree contains two modified files and three new local test/setup files; these changes remain uncommitted and have not been pushed. The next action is for the developer to commit and push the verified local source/test changes when ready; do not edit source files on GitHub. Once that commit is pushed, synchronize this tracker with the resulting repository state. Then enable and runtime-test PostgreSQL/SQLite where practical, followed by environment configuration and service-container integration. The expanded roadmap also tracks additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
+**Current next action:** Database hardening and its test utilities were committed and pushed in `d49657c` (`Add multiple test cases for db connections`); the developer confirmed `main` is synchronized with `origin/main` and the working tree is clean. Next, inspect the active PHP CLI configuration and available PDO drivers, then enable and runtime-test PostgreSQL (`pdo_pgsql`) and SQLite (`pdo_sqlite`) where practical. Do not mark either driver runtime-tested until actual connections and representative operations pass. Afterward, implement environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The expanded roadmap also tracks additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
