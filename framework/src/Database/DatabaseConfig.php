@@ -14,40 +14,48 @@ class DatabaseConfig
 
     public function __construct(array $config)
     {
-        $this->default = $config['default'] ?? '';
-        $this->connections = $config['connections'] ?? [];
+        $default = $config['default'] ?? null;
+        $connections = $config['connections'] ?? null;
 
-        if ($this->default === '') {
+        if (!is_string($default) || trim($default) === '') {
             throw new InvalidArgumentException(
                 'A default database connection must be configured.'
             );
         }
 
-        if (!isset($this->connections[$this->default])) {
-            throw new InvalidArgumentException(
-                "Default database connection [{$this->default}] is not configured."
-            );
-        }
-
-        if (!is_array($this->connections)) {
+        if (!is_array($connections)) {
             throw new InvalidArgumentException(
                 'Database connections must be an array.'
             );
         }
 
-        foreach ($this->connections as $name => $connection) {
+        if (!array_key_exists($default, $connections)) {
+            throw new InvalidArgumentException(
+                "Default database connection [{$default}] is not configured."
+            );
+        }
+
+        foreach ($connections as $name => $connection) {
             if (!is_array($connection)) {
                 throw new InvalidArgumentException(
                     "Database connection [{$name}] must be an array."
                 );
             }
 
-            if (!isset($connection['driver'])) {
+            if (
+                !isset($connection['driver'])
+                || !is_string($connection['driver'])
+                || trim($connection['driver']) === ''
+            ) {
                 throw new InvalidArgumentException(
-                    "Database connection [{$name}] must define a driver."
+                    "Database connection [{$name}] must define a non-empty driver."
                 );
             }
         }
+
+        // Assign properties only after validating the configuration.
+        $this->default = $default;
+        $this->connections = $connections;
     }
 
     public function defaultConnection(): string
