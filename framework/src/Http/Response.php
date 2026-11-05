@@ -68,7 +68,8 @@ class Response
      */
     public static function json(
         array $data,
-        int $statusCode = 200
+        int $statusCode = 200,
+        array $headers = []
     ): self {
         $content = json_encode(
             $data,
@@ -76,12 +77,16 @@ class Response
                 | JSON_UNESCAPED_UNICODE
                 | JSON_UNESCAPED_SLASHES
         );
+
         return new self(
             $content,
             $statusCode,
-            [
-                'Content-Type' => 'application/json; charset=utf-8',
-            ]
+            array_merge(
+                [
+                    'Content-Type' => 'application/json; charset=utf-8',
+                ],
+                $headers
+            )
         );
     }
 
