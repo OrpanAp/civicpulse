@@ -298,6 +298,8 @@ Developer environment and verification:
 
 - [x] PHP PDO is enabled.
 - [x] The `pdo_mysql` extension is available.
+- [x] PHP 8.5.12 permanently loads `pdo_pgsql` and `pdo_sqlite` alongside `pdo_mysql`; `PDO::getAvailableDrivers()` reports `mysql`, `pgsql`, and `sqlite`.
+- [x] SQLite runtime-tested through CivicPulse's `ConnectionFactory` and `Connection`: in-memory database creation, table creation, parameterized insert/select, scalar count, transaction commit, and rollback all passed.
 - [x] The MariaDB server responds with version `10.4.32-MariaDB`.
 - [x] All ten database PHP files passed `php -l`.
 - [x] `php tests/database_connection.php` passed against the real MariaDB server, including parameterized queries, connection caching, transaction commit, nested-transaction rejection, and rollback.
@@ -317,7 +319,7 @@ The connection integration test currently overrides the MySQL test connection to
 
 Important limitations and verification boundaries:
 
-- PostgreSQL and SQLite driver files passed PHP syntax checks, but their actual connections have not been tested because the current PHP installation exposes only the `mysql` PDO driver.
+- PostgreSQL's PDO extension (`pdo_pgsql`) is now enabled and listed by PHP, but a PostgreSQL server connection has not yet been tested. The `psql` command is not currently available in Git Bash (`command not found`); this alone does not establish whether a PostgreSQL Windows service is installed. SQLite's PDO extension (`pdo_sqlite`) is enabled, and actual runtime operations through CivicPulse's `ConnectionFactory` and `Connection` have passed locally.
 - MariaDB is reached through PDO's `pdo_mysql` driver; it does not require a separate `pdo_mariadb` extension.
 - The current database configuration reads process environment variables with `getenv()`. A project environment-file loader has not yet been implemented.
 - The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
@@ -438,7 +440,7 @@ Relational database adapters to support over time:
 
 - [x] MySQL/MariaDB PDO driver implementation (MariaDB runtime-tested).
 - [ ] PostgreSQL PDO runtime verification after enabling `pdo_pgsql`.
-- [ ] SQLite PDO runtime verification after enabling `pdo_sqlite`.
+- [x] SQLite PDO runtime verification: in-memory connection and representative query/transaction operations passed locally.
 - [ ] SQL Server PDO adapter, subject to `pdo_sqlsrv` availability.
 - [ ] Oracle PDO adapter, subject to `pdo_oci` availability.
 - [ ] Firebird PDO adapter, subject to `pdo_firebird` availability.
@@ -640,4 +642,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Database hardening and its test utilities were committed and pushed in `d49657c` (`Add multiple test cases for db connections`); the developer confirmed `main` is synchronized with `origin/main` and the working tree is clean. Next, inspect the active PHP CLI configuration and available PDO drivers, then enable and runtime-test PostgreSQL (`pdo_pgsql`) and SQLite (`pdo_sqlite`) where practical. Do not mark either driver runtime-tested until actual connections and representative operations pass. Afterward, implement environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The expanded roadmap also tracks additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
+**Current next action:** SQLite PDO runtime support is now verified locally, and PHP permanently exposes all three PDO drivers (`mysql`, `pgsql`, and `sqlite`). Determine whether a PostgreSQL Windows service/server is installed; if available, connect through CivicPulse's existing PostgreSQL driver and run representative query and transaction tests. If no server is installed, decide whether to install PostgreSQL or defer its runtime verification. Do not mark PostgreSQL runtime-tested until a real connection and representative operations pass. Afterward, implement environment-file configuration and service-container integration. Do not edit source files on GitHub; coding remains local. The expanded roadmap also tracks additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, a MongoDB contract if justified, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat each item as planned until implemented and tested; maintain a per-driver support matrix and never check off an adapter based on a class file or syntax check alone.
