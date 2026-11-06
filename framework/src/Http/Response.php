@@ -100,4 +100,27 @@ class Response
 
         echo $this->content;
     }
+
+    /**
+     * Return a new Response with the supplied header.
+     */
+    public function withHeader(string $name, string $value): self
+    {
+        $headers = $this->headers;
+
+        // HTTP header names are case-insensitive.
+        foreach (array_keys($headers) as $existingName) {
+            if (strcasecmp($existingName, $name) === 0) {
+                unset($headers[$existingName]);
+            }
+        }
+
+        $headers[$name] = $value;
+
+        return new self(
+            $this->content,
+            $this->statusCode,
+            $headers
+        );
+    }
 }

@@ -11,6 +11,7 @@ use CivicPulse\Framework\Database\ConnectionFactory;
 use CivicPulse\Framework\Database\DatabaseConfig;
 use CivicPulse\Framework\Database\DatabaseManager;
 use CivicPulse\Framework\Routing\Router;
+use CivicPulse\Framework\Logging\LoggerInterface;
 
 echo "Testing application service bootstrap..." . PHP_EOL;
 
@@ -130,6 +131,18 @@ $application = $container->make(Application::class);
 bootstrapCheck(
     $application instanceof Application,
     'Application resolves through automatic dependency injection'
+);
+
+$logger = $container->make(LoggerInterface::class);
+
+bootstrapCheck(
+    $logger instanceof LoggerInterface,
+    'Logger interface resolves from the container'
+);
+
+bootstrapCheck(
+    $container->make(LoggerInterface::class) === $logger,
+    'Logger is registered as a singleton'
 );
 
 echo PHP_EOL . "All application service bootstrap tests passed." . PHP_EOL;

@@ -9,6 +9,8 @@ use CivicPulse\Framework\Database\ConnectionFactory;
 use CivicPulse\Framework\Database\DatabaseConfig;
 use CivicPulse\Framework\Database\DatabaseManager;
 use CivicPulse\Framework\Routing\Router;
+use CivicPulse\Framework\Logging\ErrorLogLogger;
+use CivicPulse\Framework\Logging\LoggerInterface;
 
 $basePath = dirname(__DIR__);
 
@@ -36,6 +38,12 @@ $container->singleton(
             $config->get('database', [])
         );
     }
+);
+
+// Register the application logger.
+$container->singleton(
+    LoggerInterface::class,
+    ErrorLogLogger::class
 );
 
 $container->singleton(ConnectionFactory::class);

@@ -11,6 +11,7 @@ class Request
     private array $query = [];
     private array $headers = [];
     private string $body;
+    private array $attributes = [];
 
     public function __construct(string $method, string $uri, array $headers = [], string $body = '')
     {
@@ -71,5 +72,23 @@ class Request
         $body = file_get_contents('php://input') ?: '';
 
         return new self($method, $uri, $headers, $body);
+    }
+
+    /**
+     * Store request-specific data.
+     */
+    public function setAttribute(string $name, mixed $value): void
+    {
+        $this->attributes[$name] = $value;
+    }
+
+    /**
+     * Retrieve request-specific data.
+     */
+    public function getAttribute(
+        string $name,
+        mixed $default = null
+    ): mixed {
+        return $this->attributes[$name] ?? $default;
     }
 }
