@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use CivicPulse\Framework\Http\TrustedProxyResolver;
 use CivicPulse\Framework\Application\Application;
 use CivicPulse\Framework\Configuration\ConfigRepository;
 use CivicPulse\Framework\Container\Container;
@@ -112,6 +113,15 @@ bootstrapCheck(
     'Database manager is a singleton'
 );
 
+// Trusted proxy resolver.
+
+$trustedProxyResolver = $container->make(TrustedProxyResolver::class);
+
+bootstrapCheck(
+    $trustedProxyResolver instanceof TrustedProxyResolver,
+    'Trusted proxy resolver resolves through automatic dependency injection'
+);
+
 // Router and application.
 
 $router = $container->make(Router::class);
@@ -131,6 +141,16 @@ $application = $container->make(Application::class);
 bootstrapCheck(
     $application instanceof Application,
     'Application resolves through automatic dependency injection'
+);
+
+$applicationResolverProperty = new ReflectionProperty(
+    Application::class,
+    'trustedProxyResolver'
+);
+
+bootstrapCheck(
+    $applicationResolverProperty->getValue($application) instanceof TrustedProxyResolver,
+    'Application receives the trusted proxy resolver through dependency injection'
 );
 
 $logger = $container->make(LoggerInterface::class);

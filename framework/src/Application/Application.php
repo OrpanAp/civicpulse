@@ -9,14 +9,19 @@ use CivicPulse\Framework\Http\Middleware\MiddlewarePipeline;
 use CivicPulse\Framework\Http\Request;
 use CivicPulse\Framework\Http\Response;
 use CivicPulse\Framework\Routing\Router;
+use CivicPulse\Framework\Http\TrustedProxyResolver;
 
 class Application
 {
     private MiddlewarePipeline $pipeline;
+    private ?TrustedProxyResolver $trustedProxyResolver;
 
-    public function __construct(Router $router)
-    {
+    public function __construct(
+        Router $router,
+        ?TrustedProxyResolver $trustedProxyResolver = null
+    ) {
         $this->pipeline = new MiddlewarePipeline($router);
+        $this->trustedProxyResolver = $trustedProxyResolver;
     }
 
     /**
@@ -40,7 +45,9 @@ class Application
      */
     public function run(): void
     {
-        $request = Request::createFromGlobals();
+        $request = Request::createFromGlobals(
+            $this->trustedProxyResolver
+        );
 
         $response = $this->handle($request);
 
