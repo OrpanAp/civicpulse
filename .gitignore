@@ -1,0 +1,20 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+/vendor/
+
+# Runtime files
+/storage/logs/*
+/storage/cache/*
+
+# Local database files
+/database/*.sqlite
+/database/*.sqlite-*
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
