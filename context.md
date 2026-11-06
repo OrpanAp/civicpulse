@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle and an initial multi-driver PDO database foundation have been implemented and locally verified. CivicPulse report persistence is not yet connected.
+**Project status:** Early development — HTTP lifecycle, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented and locally verified. CivicPulse report persistence is not yet connected.
 
 ---
 
@@ -378,6 +378,85 @@ The developer ran an inline PHP script from the project root using Composer auto
 - The existing `tests/database_connection.php` remains MySQL/MariaDB-specific (for example, it uses `SELECT VERSION()` and `AUTO_INCREMENT`). PostgreSQL was therefore tested with a separate inline script rather than changing the existing shared test.
 - PostgreSQL is locally integration-tested; it is not yet production-verified. No new committed PostgreSQL test script has been added.
 
+### 5.9 Environment loading, configuration repository, service container, and bootstrap integration
+
+**Status: Implemented locally and fully verified on 2026-11-06.** The developer's latest local working-tree report shows the bootstrap integration and container implementation as uncommitted local changes. Do not describe these changes as committed or present on GitHub source files.
+
+**Environment and configuration services**
+
+Files:
+- `framework/src/Configuration/Environment.php`
+- `framework/src/Configuration/ConfigRepository.php`
+- `tests/environment.php`
+- `tests/config_repository.php`
+
+Verified behavior:
+- [x] Environment loader reads simple key/value entries, quoted values, blank lines, comments, and supported double-quoted escapes.
+- [x] Existing process environment values are preserved.
+- [x] Missing optional files are allowed; missing required files and malformed entries are rejected.
+- [x] Environment variable interpolation and shell execution are not performed.
+- [x] Configuration repository loads trusted PHP configuration files from the configured directory.
+- [x] Dotted-key access, defaults, key-existence checks, full configuration retrieval, and preservation of original value types/null values work.
+- [x] Missing configuration directories and configuration files that do not return arrays are rejected.
+- [x] `php tests/environment.php` passed all 12 checks.
+- [x] `php tests/config_repository.php` passed all 12 checks.
+
+**Dependency injection container**
+
+Files:
+- `framework/src/Container/Container.php`
+- `framework/src/Container/ContainerException.php`
+- `tests/container.php`
+
+Verified behavior:
+- [x] Transient bindings, singleton bindings, prebuilt instances, interface-to-concrete bindings, and closure factories.
+- [x] Automatic constructor dependency resolution, including nested dependencies and constructor defaults.
+- [x] Clear rejection of unresolved scalar, union, and intersection dependencies.
+- [x] Circular dependency and circular alias detection with resolution-chain diagnostics.
+- [x] Failed resolution cleanup, singleton factory caching, rebinding behavior, nullable class dependencies, and invalid factory-result rejection.
+- [x] Unbound interfaces, abstract classes, missing classes, and empty service identifiers are rejected.
+- [x] `php tests/container.php` passed all 26 checks.
+
+**Application bootstrap integration**
+
+Files:
+- `bootstrap/app.php`
+- `public/index.php`
+- `tests/bootstrap.php`
+
+Verified behavior:
+- [x] Bootstrap loads the environment file before trusted PHP configuration.
+- [x] Bootstrap registers the configuration repository as a shared instance.
+- [x] DatabaseConfig, ConnectionFactory, DatabaseManager, and Router are registered as singletons.
+- [x] Application is automatically constructed through dependency injection.
+- [x] The front controller resolves the shared Router and Application from the container before dispatching the HTTP request.
+- [x] `php tests/bootstrap.php` passed all 17 checks, including shared-instance and singleton behavior.
+- [x] Real HTTP requests through the PHP development server returned the expected results: GET `/` = 200, GET `/reports` = 200, GET `/unknown` = 404, and POST `/reports` = 405 with `Allow: GET`.
+- [x] The HTTP test confirms the existing reports response remains a placeholder; persistence is not connected.
+
+**Full local verification reported on 2026-11-06**
+
+The developer ran the following scripts successfully:
+- [x] `php tests/environment.php` — 12 checks.
+- [x] `php tests/config_repository.php` — 12 checks.
+- [x] `php tests/container.php` — 26 checks.
+- [x] `php tests/bootstrap.php` — 17 checks.
+- [x] `php tests/http_lifecycle.php` — 8 checks.
+- [x] `php tests/database_config.php` — 8 checks.
+- [x] `php tests/database_factory.php` — all applicable checks passed; PostgreSQL and SQLite extension-absence checks were skipped because both extensions are installed; MySQL and MariaDB aliases passed.
+- [x] `php tests/database_connection.php` — MariaDB 10.4.32 connection, parameterized query, connection caching, transaction commit, nested-transaction rejection, and rollback all passed.
+- [x] Live HTTP smoke tests — all four route/method cases returned the expected status and response.
+- [x] `git diff --check` — no whitespace errors.
+
+**Local working-tree boundary at the end of this verification**
+
+The developer reported:
+- Modified: `bootstrap/app.php`, `public/index.php`, `tests/bootstrap.php`.
+- Untracked: `framework/src/Container/`, `tests/container.php`.
+- No other changes appeared in `git status --short`.
+- `git diff --stat` showed 130 insertions and 21 deletions across the three modified tracked files; this stat does not include the untracked container files.
+- No source-code changes were made directly on GitHub. The above local changes have not been claimed as committed or pushed.
+
 ### 5.7 Documentation
 
 - [x] `README.md` created and committed.
@@ -468,9 +547,9 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 
 ### Milestone 2 — Application foundation and configuration
 
-- [ ] Dependency injection / service container.
-- [ ] Application configuration and configuration access.
-- [ ] Environment-file loader, safe secret handling, and environment validation.
+- [x] Dependency injection / service container — implemented and locally tested; see section 5.9.
+- [x] Application configuration and configuration access — implemented and locally tested; see section 5.9.
+- [x] Environment-file loader, safe secret handling, and environment validation — initial loader implemented and tested; production secret-management policy remains future work.
 - [ ] Centralized exception handling and error responses.
 - [ ] A consistent automated test structure.
 
@@ -490,7 +569,7 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 Relational database adapters to support over time:
 
 - [x] MySQL/MariaDB PDO driver implementation (MariaDB runtime-tested).
-- [ ] PostgreSQL PDO runtime verification after enabling `pdo_pgsql`.
+- [x] PostgreSQL PDO runtime verification — PostgreSQL 18.6 locally integration-tested; see section 5.8.
 - [x] SQLite PDO runtime verification: in-memory connection and representative query/transaction operations passed locally.
 - [ ] SQL Server PDO adapter, subject to `pdo_sqlsrv` availability.
 - [ ] Oracle PDO adapter, subject to `pdo_oci` availability.
@@ -799,4 +878,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** MariaDB, SQLite, and PostgreSQL 18.6 have all passed local runtime checks through CivicPulse's current PDO connection layer. The PostgreSQL test used the dedicated `civicpulse_test` database and an inline PHP test; it did not add or change framework source files. Next, inspect the local working tree and current configuration, then proceed with the environment-file loader and service-container integration. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The initial application foundation is now implemented and locally verified: environment-file loading, trusted PHP configuration loading/access, dependency injection, service registrations, and container-based front-controller bootstrap. The complete local test run on 2026-11-06 passed the environment (12), configuration repository (12), container (26), bootstrap (17), HTTP lifecycle (8), database configuration (8), database factory (all applicable checks), and MariaDB connection/transaction suites. Four live HTTP smoke tests also returned the expected 200, 404, and 405 responses. The developer's latest working tree still contains uncommitted local changes in `bootstrap/app.php`, `public/index.php`, `tests/bootstrap.php`, `framework/src/Container/`, and `tests/container.php`; do not claim these source changes are committed or present on GitHub. The next development task is Milestone 3: define the middleware contract and implement the HTTP middleware pipeline, with registration order and request/response flow covered by tests. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
