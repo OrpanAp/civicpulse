@@ -2,7 +2,7 @@
 
 > **Purpose of this file:** Preserve the project's original motivation, current technical state, decisions, and next actions. Update this file as work is completed so development can continue across sessions without relying on chat history.
 
-**Last updated:** 2026-11-05  
+**Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
 **Project status:** Early development — HTTP lifecycle and an initial multi-driver PDO database foundation have been implemented and locally verified. CivicPulse report persistence is not yet connected.
@@ -38,7 +38,25 @@ The intended product should support a meaningful lifecycle:
 
 These are product goals. They are **not** claims that these features have already been implemented.
 
-### 1.2 Build the PHP framework ourselves
+### 1.3 Provide a built-in administrative experience
+
+CivicPulse should include a first-party, customizable dashboard and admin panel with the convenience and completeness of Django's built-in admin, while being independently designed and implemented as part of this project. It should not be an afterthought or a third-party dependency. The administrative experience should eventually let authorized staff manage the platform and its civic data through a secure web interface.
+
+The intended capabilities include:
+
+- A configurable dashboard with useful operational summaries, report statistics, pending reviews, workload, recent activity, and actionable alerts.
+- User administration, account status management, authentication, password reset/change flows, and secure session handling.
+- Role-based access control (RBAC), permissions, role assignment, permission checks, and policies for resource- and action-level authorization.
+- Distinct citizen, reviewer, staff, administrator, and other roles only where actual workflows require them; do not rely on hiding UI controls as an authorization mechanism.
+- Administrative resource screens with search, filtering, sorting, pagination, detail views, safe create/update actions, bulk actions where appropriate, and validation feedback.
+- Management of report categories, reports, assignments, review queues, status transitions, and reference data according to the current user's permissions.
+- Audit trails for sensitive administrative actions, clear attribution, and safe handling of personal data.
+- Extensible dashboard widgets, navigation, resource definitions, and reusable UI components so application developers can tailor the admin experience without forking framework internals.
+- Responsive, accessible layouts, clear empty/error/loading states, and safe defaults suitable for real operational use.
+
+This is a product and framework requirement, not a claim that authentication, authorization, RBAC, dashboard pages, or admin CRUD are implemented today. Build it on explicit authentication, authorization, policy, session, validation, and audit services; never treat a hidden menu item or template directive as a security boundary.
+
+
 
 The second ambition is equally important: build the PHP framework that powers CivicPulse rather than using Laravel or another full-stack framework to do the work for us.
 
@@ -611,6 +629,10 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 - [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
 - [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
 - [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials.
+- [ ] `@components("component.php")` — proposed component-rendering syntax for reusable, parameterized UI components; define its exact naming, data/slot, escaping, and nesting contract before implementation.
+- [ ] `@call("include.php/style.css/main.js")` — proposed asset/include registration or resolution syntax; specify whether each path is a PHP partial, stylesheet, or script, how assets are emitted, ordering/deduplication, and path safety before implementation.
+- [ ] `@build("include.php")` — proposed composition/build directive for assembling a reusable include or view fragment; define how it differs from `@include` and `@components` before implementation.
+- [ ] Keep the three proposed directives distinct only if they provide genuinely different, documented behavior. If their responsibilities overlap, refine or consolidate the syntax before freezing a public API. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
 - [ ] `@auth`, `@guest`, and role/permission directives only after authentication and authorization services exist.
 - [ ] `@error` and validation-error helpers after the validation and form-error contracts exist.
 - [ ] Escaped output by default, with an explicit and carefully controlled raw-output escape hatch.
@@ -661,6 +683,49 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - [ ] Deployment configuration and CI/CD.
 - [ ] Multi-instance deployment and infrastructure health checks.
 - [ ] Operational and developer documentation.
+
+### Milestone 15 — Built-in dashboard, admin panel, and access management
+
+**Authentication and identity foundation**
+
+- [ ] Implement secure authentication flows: registration where enabled, login/logout, password hashing, password change/reset, session rotation, remember-me only with a reviewed token design, and account status/lockout policies.
+- [ ] Define user identity and account models with validated fields, unique identifiers, safe serialization, and protected credential handling.
+- [ ] Implement authorization independently from authentication. A signed-in user is not automatically authorized to perform an action.
+- [ ] Implement roles and permissions with explicit many-to-many relationships, permission naming conventions, role assignment/revocation, and deterministic permission evaluation.
+- [ ] Add policies or equivalent resource-aware authorization for actions such as view, create, update, delete, verify, assign, publish, and administer.
+- [ ] Enforce authorization in the server-side request/controller/service layer for every protected operation. UI visibility and template directives are convenience features only.
+- [ ] Test unauthenticated, authenticated-but-forbidden, permitted, revoked-permission, inactive-account, and cross-user/resource access cases.
+
+**Built-in administrative application**
+
+- [ ] Provide a first-party admin area with its own route group, middleware, layout, navigation, dashboard, and configurable resource registry.
+- [ ] Provide dashboard cards/widgets for pending report review, report status distribution, unresolved/high-priority issues, assignment workload, recent activity, and other metrics justified by actual CivicPulse workflows.
+- [ ] Provide secure user, role, and permission administration, including role assignment and revocation with audit events.
+- [ ] Provide administrative screens for report review, verification, duplicate grouping, prioritization, assignment, category/reference-data management, and status transitions as those domain services are implemented.
+- [ ] Provide reusable resource views and actions with search, filtering, sorting, pagination, detail pages, validation, safe bulk operations, and clear empty/error states.
+- [ ] Support configurable navigation, dashboard widgets, resource fields/actions, and per-resource policies without allowing configuration to bypass authorization.
+- [ ] Record sensitive administrative actions in an append-only or tamper-evident audit design appropriate to the deployment, including actor, action, target, timestamp, and relevant change metadata while minimizing sensitive data.
+- [ ] Add accessibility, responsive behavior, CSRF protection, output escaping, secure uploads, and administrative security tests.
+- [ ] Keep the admin interface useful for CivicPulse first, while exposing stable extension points so the custom framework can reuse it in other applications.
+
+**Reusable component and asset composition in templates**
+
+- [ ] Build a first-class component/partial system with explicit inputs, optional slots/sections, predictable scope, escaping by default, and nested composition.
+- [ ] Evaluate and formally specify the requested syntax `@components("component.php")` for rendering reusable components. Define whether it accepts data/props and slots; avoid ambiguous implicit variable sharing.
+- [ ] Evaluate and formally specify `@call("include.php/style.css/main.js")` for registering or including PHP partials and front-end assets. Define typed asset handling, output locations, dependency ordering, duplicate prevention, cache behavior, and safe path resolution.
+- [ ] Evaluate and formally specify `@build("include.php")` for composing/building a view or include. Document exactly how it differs from a component render or ordinary include; consolidate directives if distinct semantics cannot be justified.
+- [ ] Support layouts, reusable components, partials, asset stacks/bundles, and page-level composition without repeated markup or duplicated script/style tags.
+- [ ] Test nested components, data isolation, escaping, malformed syntax, asset ordering, duplicate registration, cache invalidation, and traversal/unauthorized-path attempts.
+- [ ] Treat these strings as proposed template-language syntax, not PHP functions or already-implemented directives. Finalize the public API only after the template compiler and view runtime exist.
+
+**Milestone completion criteria**
+
+- [ ] A real administrator can sign in and manage users, roles, permissions, and relevant CivicPulse resources through the browser.
+- [ ] Authorization is enforced server-side and covered by positive and negative integration tests.
+- [ ] Dashboard figures are derived from real application data, not hard-coded demo values.
+- [ ] Component and asset composition works end-to-end in rendered pages and passes security and caching tests.
+
+---
 
 ### Milestone 14 — Framework developer experience, resource generators, and expressive APIs
 
