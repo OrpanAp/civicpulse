@@ -748,7 +748,7 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 - [x] Request logging and correlation/request IDs — generated request IDs, response header propagation, structured success/failure logging, and logging-failure isolation implemented and tested; see section 5.11.
 - [x] Configurable HTTP security headers — implemented and tested; see section 5.12.
 - [x] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation; implemented and tested locally, including real HTTP checks. See section 5.13.
-- [ ] Session abstraction and session middleware.
+- [x] Native PHP session abstraction, environment-driven session configuration, session manager, and session middleware — implemented and locally tested; application integration and persistence across requests verified in section 5.14. Changes remain local and have not been reported as committed or pushed.
 - [ ] Authentication and authorization middleware when those features are introduced.
 
 ### Milestone 4 — Extensible database and storage foundation
@@ -1066,4 +1066,40 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured request logging, configurable HTTP security headers, and trusted-proxy handling are implemented, locally tested, committed, and pushed to `origin/main`. The latest source commit is `2087a7c` (`Add trusted proxy support`), pushed successfully after rebasing the local trusted-proxy commit onto remote commit `5543634` (`Delete folder-boilerplate-1.3.1.vsix`). The trusted-proxy milestone passed all eight reported regression scripts, seven PHP syntax checks, whitespace validation, and real HTTP checks with both default-untrusted and explicitly trusted proxy configurations; see section 5.13. The next unchecked task within Milestone 3 is a session abstraction and session middleware. Authentication and authorization middleware remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured request logging, configurable HTTP security headers, trusted-proxy handling, and native PHP session infrastructure are implemented and locally tested. The trusted-proxy source commit `2087a7c` (`Add trusted proxy support`) is pushed to `origin/main`; the session implementation described in section 5.14 is currently local and has not been reported as committed or pushed. The next task is CSRF protection: design and implement token generation, storage, validation, and middleware, then test safe methods, missing/invalid tokens, and end-to-end request handling. Authentication and authorization middleware remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+
+### 5.14 Session abstraction, configuration, and request lifecycle
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. Changes remain local; no session source commit or push has been reported.**
+
+Implemented locally:
+
+- [x] `SessionInterface` defines the session data contract: get, set, has, remove, clear, and session ID regeneration.
+- [x] `NativeSession` adapts PHP's native session storage and rejects access when no active, valid session is available.
+- [x] `config/session.php` provides environment-driven session enablement and cookie configuration, with validated booleans, non-negative lifetime, and automatic Secure-cookie mode.
+- [x] `.env.example` documents session settings; the local `.env` contains corresponding development settings and remains ignored.
+- [x] Framework-enforced PHP session policies require strict mode and cookie-only session IDs, and disable transparent session ID propagation.
+- [x] `SessionManager` validates configuration, configures PHP session/cookie settings, starts and closes sessions, tracks ownership, enforces Secure cookies on HTTPS, and rejects insecure `SameSite=None` configuration.
+- [x] `SessionMiddleware` starts the session before downstream handling, attaches the session adapter to the request, and closes the session after normal or exceptional downstream handling while preserving the original application exception.
+- [x] Session manager and middleware are registered/resolved through the application container; bootstrap tests verify the manager singleton and the exact shared manager injected into the middleware.
+- [x] The front controller registers session middleware after request ID, request logging, and security-header middleware, and before the router destination.
+- [x] Application integration verifies session availability inside a real route, response propagation, session closure, and data persistence across two application requests.
+
+**Developer-reported local verification on 2026-11-06:**
+
+- [x] `php tests/session.php` — 12 assertions passed.
+- [x] `php tests/session_config.php` — 24 assertions passed.
+- [x] `php tests/session_manager.php` — 20 assertions passed.
+- [x] `php tests/session_middleware.php` — 11 assertions passed.
+- [x] `php tests/session_application.php` — 12 assertions passed.
+- [x] `php tests/bootstrap.php` — 30 assertions passed, including session service dependency injection.
+- [x] All six reported test suites passed: 109 assertions total.
+- [x] The developer separately reported clean PHP syntax checks for `bootstrap/app.php`, `public/index.php`, and the new application session test.
+
+**Scope and limitations:**
+
+- The implementation currently uses PHP's native session handler. File/database/Redis session-store adapters remain future work and must be designed behind appropriate storage contracts if/when required.
+- CSRF token generation and validation, CSRF middleware, authentication, and authorization are not implemented by this milestone. `SameSite=Lax` is a useful cookie policy but does not replace CSRF token validation.
+- Tests were run locally by the developer. The session changes have not been reported as committed or pushed, and no production deployment verification is claimed.
+
+**Definition of Done:** session abstraction, configuration, manager, middleware, dependency-injection integration, and two-request application persistence all passed the six locally reported test suites (109 assertions). The next security milestone is CSRF protection.
