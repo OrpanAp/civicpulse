@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented and locally verified. CivicPulse report persistence is not yet connected.
+**Project status:** Early development — HTTP lifecycle, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
 
 ---
 
@@ -380,7 +380,7 @@ The developer ran an inline PHP script from the project root using Composer auto
 
 ### 5.9 Environment loading, configuration repository, service container, and bootstrap integration
 
-**Status: Implemented locally and fully verified on 2026-11-06.** The developer's latest local working-tree report shows the bootstrap integration and container implementation as uncommitted local changes. Do not describe these changes as committed or present on GitHub source files.
+**Status: Implemented, fully verified locally, committed, and pushed to GitHub `main` on 2026-11-06.** The implementation is included in commit `e1487fe` (`feat: add dependency injection container and application bootstrap`).
 
 **Environment and configuration services**
 
@@ -448,14 +448,14 @@ The developer ran the following scripts successfully:
 - [x] Live HTTP smoke tests — all four route/method cases returned the expected status and response.
 - [x] `git diff --check` — no whitespace errors.
 
-**Local working-tree boundary at the end of this verification**
+**Commit and synchronization status**
 
-The developer reported:
-- Modified: `bootstrap/app.php`, `public/index.php`, `tests/bootstrap.php`.
-- Untracked: `framework/src/Container/`, `tests/container.php`.
-- No other changes appeared in `git status --short`.
-- `git diff --stat` showed 130 insertions and 21 deletions across the three modified tracked files; this stat does not include the untracked container files.
-- No source-code changes were made directly on GitHub. The above local changes have not been claimed as committed or pushed.
+- [x] The developer committed the verified local changes and rebased the two local commits onto the updated remote `main` history.
+- [x] The final pushed commit is `e1487fe` (`feat: add dependency injection container and application bootstrap`).
+- [x] The developer ran `git fetch origin` and confirmed `main` and `origin/main` both point to `e1487fe`.
+- [x] `git status -sb` returned `## main...origin/main`, confirming the local branch is synchronized and the working tree is clean.
+- [x] The remote `context.md` update from `0928f10` is included in the history before the application-container commit.
+- [x] No force-push or destructive reset was used.
 
 ### 5.7 Documentation
 
@@ -878,4 +878,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The initial application foundation is now implemented and locally verified: environment-file loading, trusted PHP configuration loading/access, dependency injection, service registrations, and container-based front-controller bootstrap. The complete local test run on 2026-11-06 passed the environment (12), configuration repository (12), container (26), bootstrap (17), HTTP lifecycle (8), database configuration (8), database factory (all applicable checks), and MariaDB connection/transaction suites. Four live HTTP smoke tests also returned the expected 200, 404, and 405 responses. The developer's latest working tree still contains uncommitted local changes in `bootstrap/app.php`, `public/index.php`, `tests/bootstrap.php`, `framework/src/Container/`, and `tests/container.php`; do not claim these source changes are committed or present on GitHub. The next development task is Milestone 3: define the middleware contract and implement the HTTP middleware pipeline, with registration order and request/response flow covered by tests. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The initial application foundation is implemented, locally tested, committed, and pushed: environment-file loading, trusted PHP configuration loading/access, dependency injection, service registrations, and container-based front-controller bootstrap. The complete local test run on 2026-11-06 passed the environment (12), configuration repository (12), container (26), bootstrap (17), HTTP lifecycle (8), database configuration (8), database factory (all applicable checks), and MariaDB connection/transaction suites. Four live HTTP smoke tests returned the expected 200, 404, and 405 responses. Commit `e1487fe` is the current synchronized `main`/`origin/main` tip, and the developer confirmed a clean working tree. The next development task is Milestone 3: define the middleware contract and implement the HTTP middleware pipeline, with registration order and request/response flow covered by tests. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
