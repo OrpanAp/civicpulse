@@ -1066,7 +1066,7 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured request logging, configurable HTTP security headers, trusted-proxy handling, and native PHP session infrastructure are implemented and locally tested. The trusted-proxy source commit `2087a7c` (`Add trusted proxy support`) is pushed to `origin/main`; the session implementation described in section 5.14 is currently local and has not been reported as committed or pushed. The next task is CSRF protection: design and implement token generation, storage, validation, and middleware, then test safe methods, missing/invalid tokens, and end-to-end request handling. Authentication and authorization middleware remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable security headers, trusted-proxy handling, native PHP session infrastructure, and CSRF token/middleware integration have been implemented and locally tested. The trusted-proxy source commit `2087a7c` (`Add trusted proxy support`) is pushed to `origin/main`; the session and CSRF source changes remain local and have not been reported as committed or pushed. The next development milestone is the secure template/view foundation. Begin with a ViewFinder that resolves template names only within approved view directories and rejects traversal attempts; add focused tests before building the compiler and renderer. The intended initial architecture is a public View API, ViewFinder, template Compiler, CompiledViewCache, and ViewRenderer, with compiled PHP stored outside the public directory. The first end-to-end view milestone should render a simple template with automatic HTML escaping and safe cache invalidation. config/app.php does not currently exist; inspect the actual configuration conventions before introducing view configuration. The local inspection also found no resources/ directory or existing view/compiler classes. Authentication and authorization remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while context.md may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with @csrf and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
 
 ### 5.14 Session abstraction, configuration, and request lifecycle
 
@@ -1099,7 +1099,43 @@ Implemented locally:
 **Scope and limitations:**
 
 - The implementation currently uses PHP's native session handler. File/database/Redis session-store adapters remain future work and must be designed behind appropriate storage contracts if/when required.
-- CSRF token generation and validation, CSRF middleware, authentication, and authorization are not implemented by this milestone. `SameSite=Lax` is a useful cookie policy but does not replace CSRF token validation.
+- CSRF token generation/validation and CSRF middleware were implemented in the subsequent local milestone recorded in section 5.15. Authentication and authorization remain future work. `SameSite=Lax` is a useful cookie policy but does not replace CSRF token validation.
 - Tests were run locally by the developer. The session changes have not been reported as committed or pushed, and no production deployment verification is claimed.
 
-**Definition of Done:** session abstraction, configuration, manager, middleware, dependency-injection integration, and two-request application persistence all passed the six locally reported test suites (109 assertions). The next security milestone is CSRF protection.
+**Definition of Done:** session abstraction, configuration, manager, middleware, dependency-injection integration, and two-request application persistence all passed the six locally reported test suites (109 assertions). CSRF protection was subsequently implemented and locally verified in section 5.15.
+
+
+### 5.15 CSRF protection and parsed request-body support
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. Changes remain local; no source commit or push has been reported.**
+
+Implemented locally:
+
+- [x] Request now stores parsed form data separately from the raw request body and exposes it through getParsedBody().
+- [x] Request::createFromGlobals() supplies PHP's parsed $_POST data for ordinary POST form submissions without treating raw JSON as parsed form data.
+- [x] CsrfTokenManager generates cryptographically secure 32-byte random tokens, stores them in the session, reuses valid tokens, and validates submissions using hash_equals().
+- [x] CsrfMiddleware skips validation for GET, HEAD, and OPTIONS; validates state-changing requests using the X-CSRF-Token header or _token form field; rejects missing, malformed, conflicting, or invalid tokens and requests without an attached session.
+- [x] CSRF rejection returns HTTP 403 with a plain-text content type and Cache-Control: no-store.
+- [x] The CSRF token manager is registered as a container singleton, and the middleware resolves through the container with the shared token manager.
+- [x] The front controller registers CSRF middleware after session middleware and before the router, ensuring the session is available for token validation.
+- [x] An application-level integration test exercises token generation on GET, rejection of missing/invalid tokens, acceptance of a valid token, route non-execution on rejection, and session lifecycle behavior.
+
+**Developer-reported local verification on 2026-11-06:**
+
+- [x] php tests/request_parsed_body.php — 4 checks passed.
+- [x] php tests/csrf_token_manager.php — 11 checks passed.
+- [x] php tests/csrf_middleware.php — 27 checks passed.
+- [x] php tests/csrf_application.php — 17 checks passed.
+- [x] php tests/bootstrap.php — 35 checks passed, including CSRF service registration and dependency injection.
+- [x] All five reported test scripts passed: 94 checks total.
+- [x] The developer reported no syntax errors in the CSRF application test and successful execution of the complete listed CSRF test group.
+
+**Scope and limitations:**
+
+- Ordinary PHP-parsed POST form data is supported through $_POST. JSON and other non-form request bodies remain raw; clients using non-POST state-changing methods should submit the token through the X-CSRF-Token header.
+- Token rotation policy beyond session lifecycle/regeneration has not yet been implemented as a separate policy.
+- The template compiler/view system does not exist yet, so the planned @csrf directive is not implemented. The existing token manager and middleware provide the security mechanism that a future directive must use.
+- Authentication and authorization are not implemented.
+- These results are local developer-reported tests, not production security verification. Session and CSRF changes have not been reported as committed or pushed.
+
+**Definition of Done:** parsed request-body support, token generation and validation, middleware behavior, container registration, middleware ordering, and end-to-end application integration passed the five locally reported test scripts (94 checks). The next milestone is the template/view foundation; the future @csrf directive must render a real hidden form field backed by this existing CSRF token manager.
