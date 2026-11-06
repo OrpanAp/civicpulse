@@ -6,10 +6,11 @@ namespace CivicPulse\Framework\Routing;
 
 use CivicPulse\Framework\Http\Request;
 use CivicPulse\Framework\Http\Response;
+use CivicPulse\Framework\Http\Contracts\RequestHandlerInterface;
 use InvalidArgumentException;
 use UnexpectedValueException;
 
-class Router
+class Router implements RequestHandlerInterface
 {
     /**
      * Routes are grouped by path and HTTP method.
@@ -108,5 +109,10 @@ class Router
             ],
             404
         );
+    }
+
+    public function handle(Request $request): Response
+    {
+        return $this->dispatch($request);
     }
 }

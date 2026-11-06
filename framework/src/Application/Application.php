@@ -4,24 +4,35 @@ declare(strict_types=1);
 
 namespace CivicPulse\Framework\Application;
 
+use CivicPulse\Framework\Http\Middleware\MiddlewareInterface;
+use CivicPulse\Framework\Http\Middleware\MiddlewarePipeline;
 use CivicPulse\Framework\Http\Request;
 use CivicPulse\Framework\Http\Response;
 use CivicPulse\Framework\Routing\Router;
 
 class Application
 {
-    public function __construct(
-        private Router $router
-    ) {}
+    private MiddlewarePipeline $pipeline;
+
+    public function __construct(Router $router)
+    {
+        $this->pipeline = new MiddlewarePipeline($router);
+    }
 
     /**
-     * Handle a supplied request.
-     *
-     * This method is testable without starting a web server.
+     * Register middleware for this application instance.
+     */
+    public function addMiddleware(MiddlewareInterface $middleware): void
+    {
+        $this->pipeline->pipe($middleware);
+    }
+
+    /**
+     * Handle a supplied request through the middleware pipeline.
      */
     public function handle(Request $request): Response
     {
-        return $this->router->dispatch($request);
+        return $this->pipeline->handle($request);
     }
 
     /**
