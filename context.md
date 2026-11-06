@@ -138,43 +138,134 @@ Do not rerun the original directory setup batch file. The project structure alre
 
 ## 4. Current Repository Structure
 
+The following is the structure observed from the developer's local inspection on 2026-11-06. It reflects the actual directories and files reported at that checkpoint, including local, uncommitted session and CSRF work. It is not a claim that those local changes are already present on GitHub.
+
 ```text
 civicpulse/
-├── app/
-│   ├── Controllers/
-│   ├── Events/
-│   ├── Middleware/
-│   ├── Models/
-│   ├── Policies/
-│   └── Services/
 ├── config/
-├── database/
-│   ├── migrations/
-│   └── seeders/
+│   ├── database.php
+│   ├── security.php
+│   ├── session.php
+│   └── trusted_proxies.php
 ├── framework/
-│   ├── src/
-│   │   ├── Application/
-│   │   ├── Container/
-│   │   ├── Database/
-│   │   ├── Http/
-│   │   ├── Routing/
-│   │   ├── Support/
-│   │   └── Validation/
-│   └── tests/
+│   └── src/
+│       ├── Application/
+│       │   └── Application.php
+│       ├── Configuration/
+│       │   ├── ConfigRepository.php
+│       │   └── Environment.php
+│       ├── Container/
+│       │   ├── Container.php
+│       │   └── ContainerException.php
+│       ├── Database/
+│       │   ├── Contracts/
+│       │   ├── Drivers/
+│       │   ├── Connection.php
+│       │   ├── ConnectionFactory.php
+│       │   ├── DatabaseConfig.php
+│       │   └── DatabaseManager.php
+│       ├── Http/
+│       │   ├── Contracts/
+│       │   ├── Middleware/
+│       │   │   ├── CsrfMiddleware.php
+│       │   │   ├── MiddlewareInterface.php
+│       │   │   ├── MiddlewarePipeline.php
+│       │   │   ├── MiddlewareRequestHandler.php
+│       │   │   ├── RequestIdMiddleware.php
+│       │   │   ├── RequestLoggingMiddleware.php
+│       │   │   ├── SecurityHeadersMiddleware.php
+│       │   │   └── SessionMiddleware.php
+│       │   ├── Request.php
+│       │   ├── Response.php
+│       │   └── TrustedProxyResolver.php
+│       ├── Logging/
+│       │   ├── ErrorLogLogger.php
+│       │   └── LoggerInterface.php
+│       ├── Routing/
+│       │   ├── Router.php
+│       │   └── web.php
+│       ├── Security/
+│       │   └── Csrf/
+│       │       └── CsrfTokenManager.php
+│       └── Session/
+│           ├── NativeSession.php
+│           ├── SessionInterface.php
+│           └── SessionManager.php
+├── bootstrap/
+│   └── app.php
 ├── public/
-├── routes/
-├── storage/
+│   └── index.php
 ├── tests/
+│   ├── autoload.php
+│   ├── bootstrap.php
+│   ├── config_repository.php
+│   ├── container.php
+│   ├── csrf_application.php
+│   ├── csrf_middleware.php
+│   ├── csrf_token_manager.php
+│   ├── database_config.php
+│   ├── database_connection.php
+│   ├── database_factory.php
+│   ├── environment.php
+│   ├── http_lifecycle.php
+│   ├── http_middleware.php
+│   ├── http_request_logging.php
+│   ├── http_security_headers.php
+│   ├── request_metadata.php
+│   ├── request_parsed_body.php
+│   ├── session.php
+│   ├── session_application.php
+│   ├── session_config.php
+│   ├── session_manager.php
+│   ├── session_middleware.php
+│   ├── setup_test_database.php
+│   └── trusted_proxy_resolver.php
 ├── .env.example
 ├── .gitignore
 ├── composer.json
 └── README.md
 ```
 
-Some directories are placeholders for future work. Their presence does not mean the corresponding components are implemented.
+**Observed absences at this checkpoint:** app/ and resources/ did not exist in the developer's local directory listing. config/app.php was also absent. The Composer App namespace PSR-4 mapping exists, but that mapping alone does not mean the app/ directory has been created. The local working tree contained uncommitted and untracked session/CSRF changes; the developer had not reported them as committed or pushed.
 
----
+### 4.1 Planned template/view directory structure
 
+The following is the proposed target structure for the upcoming template/view milestone. These directories and files are **planned, not yet created or implemented**. Create them locally in stages as each component is developed and tested.
+
+```text
+framework/
+└── src/
+    └── View/
+        ├── View.php
+        ├── ViewFinder.php
+        ├── ViewRenderer.php
+        ├── Compiler/
+        │   ├── Compiler.php
+        │   └── CompiledViewCache.php
+        └── Exceptions/
+            ├── ViewException.php
+            └── ViewNotFoundException.php
+
+resources/
+└── views/
+
+storage/
+└── framework/
+    └── views/
+```
+
+**Planned responsibilities:**
+
+- View: public rendering API.
+- ViewFinder: resolve template names only inside approved view directories and reject traversal attempts.
+- Compiler: compile the supported template language into PHP without evaluating arbitrary user-provided PHP expressions.
+- CompiledViewCache: store compiled templates outside the public directory and invalidate them safely when source templates or compiler behavior changes.
+- ViewRenderer: execute compiled templates and capture rendered output.
+- ViewException and ViewNotFoundException: provide explicit, predictable template error types.
+- resources/views/: hold application view templates.
+- storage/framework/views/: hold generated compiled templates; this runtime directory must not be publicly accessible.
+
+This is an architectural proposal, not a requirement to create every class immediately. The first implementation step is ViewFinder plus focused path-resolution and traversal tests.
 ## 5. Implemented Work — Verified Repository State
 
 This section records what exists in the repository as of the date above.
