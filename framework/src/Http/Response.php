@@ -64,6 +64,26 @@ class Response
     }
 
     /**
+     * Create an HTML response.
+     */
+    public static function html(
+        string $content,
+        int $statusCode = 200,
+        array $headers = []
+    ): self {
+        return new self(
+            $content,
+            $statusCode,
+            array_merge(
+                [
+                    'Content-Type' => 'text/html; charset=utf-8',
+                ],
+                $headers
+            )
+        );
+    }
+
+    /**
      * @throws JsonException
      */
     public static function json(

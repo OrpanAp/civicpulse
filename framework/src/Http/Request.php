@@ -11,14 +11,20 @@ class Request
     private array $query = [];
     private array $headers = [];
     private string $body;
+    private array $parsedBody = [];
     private array $attributes = [];
 
     private ?string $clientIp = null;
     private string $scheme = 'http';
     private ?string $host = null;
 
-    public function __construct(string $method, string $uri, array $headers = [], string $body = '')
-    {
+    public function __construct(
+        string $method,
+        string $uri,
+        array $headers = [],
+        string $body = '',
+        array $parsedBody = []
+    ) {
         $this->method = strtoupper($method);
 
         $path = parse_url($uri, PHP_URL_PATH);
@@ -62,6 +68,8 @@ class Request
         }
 
         $this->body = $body;
+
+        $this->parsedBody = $parsedBody;
     }
 
     public function getMethod(): string
@@ -93,6 +101,14 @@ class Request
     public function getBody(): string
     {
         return $this->body;
+    }
+
+    /**
+     * Retrieve parsed request-body data.
+     */
+    public function getParsedBody(): array
+    {
+        return $this->parsedBody;
     }
 
     /**
@@ -137,6 +153,13 @@ class Request
 
         $body = file_get_contents('php://input') ?: '';
 
+        // PHP automatically parses standard POST form submissions.
+        $parsedBody = strtoupper($method) === 'POST'
+            && isset($_POST)
+            && is_array($_POST)
+            ? $_POST
+            : [];
+
         $remoteAddress = $_SERVER['REMOTE_ADDR'] ?? '';
 
         $https = strtolower(trim((string) ($_SERVER['HTTPS'] ?? '')));
@@ -147,7 +170,13 @@ class Request
             true
         ) ? 'https' : 'http';
 
-        $request = new self($method, $uri, $headers, $body);
+        $request = new self(
+            $method,
+            $uri,
+            $headers,
+            $body,
+            $parsedBody
+        );
 
         // Resolve the client IP.
         if ($trustedProxyResolver !== null) {

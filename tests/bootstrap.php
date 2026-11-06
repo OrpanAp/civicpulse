@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use CivicPulse\Framework\Http\Middleware\SessionMiddleware;
+// use CivicPulse\Framework\Session\SessionInterface;
+use CivicPulse\Framework\Session\SessionManager;
 use CivicPulse\Framework\Http\TrustedProxyResolver;
 use CivicPulse\Framework\Application\Application;
 use CivicPulse\Framework\Configuration\ConfigRepository;
@@ -13,6 +16,8 @@ use CivicPulse\Framework\Database\DatabaseConfig;
 use CivicPulse\Framework\Database\DatabaseManager;
 use CivicPulse\Framework\Routing\Router;
 use CivicPulse\Framework\Logging\LoggerInterface;
+use CivicPulse\Framework\Http\Middleware\CsrfMiddleware;
+use CivicPulse\Framework\Security\Csrf\CsrfTokenManager;
 
 echo "Testing application service bootstrap..." . PHP_EOL;
 
@@ -64,6 +69,108 @@ bootstrapCheck(
 bootstrapCheck(
     $config->get('database.connections.sqlite.driver') === 'sqlite',
     'SQLite configuration is loaded'
+);
+
+// Session configuration.
+
+bootstrapCheck(
+    $config->has('session.enabled'),
+    'Session configuration is loaded'
+);
+
+bootstrapCheck(
+    is_bool($config->get('session.enabled')),
+    'Session enabled setting is a boolean'
+);
+
+bootstrapCheck(
+    is_string($config->get('session.cookie.name'))
+        && $config->get('session.cookie.name') !== '',
+    'Session cookie name is loaded'
+);
+
+bootstrapCheck(
+    is_int($config->get('session.cookie.lifetime'))
+        && $config->get('session.cookie.lifetime') >= 0,
+    'Session cookie lifetime is a non-negative integer'
+);
+
+bootstrapCheck(
+    $config->has('session.cookie.secure')
+        && (
+            is_bool($config->get('session.cookie.secure'))
+            || $config->get('session.cookie.secure') === null
+        ),
+    'Session secure-cookie setting supports automatic mode'
+);
+
+bootstrapCheck(
+    $config->get('session.security.use_strict_mode') === true
+        && $config->get('session.security.use_only_cookies') === true
+        && $config->get('session.security.use_trans_sid') === false,
+    'Session security policies are loaded'
+);
+
+// Session services.
+
+$sessionManager = $container->make(SessionManager::class);
+
+bootstrapCheck(
+    $sessionManager instanceof SessionManager,
+    'Session manager resolves from the container'
+);
+
+bootstrapCheck(
+    $container->make(SessionManager::class) === $sessionManager,
+    'Session manager is a singleton'
+);
+
+$sessionMiddleware = $container->make(SessionMiddleware::class);
+
+// CSRF services.
+
+$csrfTokenManager = $container->make(CsrfTokenManager::class);
+
+bootstrapCheck(
+    $csrfTokenManager instanceof CsrfTokenManager,
+    'CSRF token manager resolves from the container'
+);
+
+bootstrapCheck(
+    $container->make(CsrfTokenManager::class) === $csrfTokenManager,
+    'CSRF token manager is a singleton'
+);
+
+$csrfMiddleware = $container->make(CsrfMiddleware::class);
+
+bootstrapCheck(
+    $csrfMiddleware instanceof CsrfMiddleware,
+    'CSRF middleware resolves from the container'
+);
+
+$csrfTokenManagerProperty = new ReflectionProperty(
+    CsrfMiddleware::class,
+    'tokenManager'
+);
+
+bootstrapCheck(
+    $csrfTokenManagerProperty->getValue($csrfMiddleware) === $csrfTokenManager,
+    'CSRF middleware receives the shared CSRF token manager'
+);
+
+bootstrapCheck(
+    $sessionMiddleware instanceof SessionMiddleware,
+    'Session middleware resolves from the container'
+);
+
+$sessionManagerProperty = new ReflectionProperty(
+    SessionMiddleware::class,
+    'sessionManager'
+);
+
+bootstrapCheck(
+    $sessionManagerProperty->getValue($sessionMiddleware) === $sessionManager,
+    'Session middleware receives the shared session manager'
 );
 
 // Database configuration.
