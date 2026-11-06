@@ -7,6 +7,7 @@ use CivicPulse\Framework\Container\Container;
 use CivicPulse\Framework\Routing\Router;
 use CivicPulse\Framework\Http\Middleware\RequestIdMiddleware;
 use CivicPulse\Framework\Http\Middleware\RequestLoggingMiddleware;
+use CivicPulse\Framework\Http\Middleware\SecurityHeadersMiddleware;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -31,6 +32,10 @@ $application->addMiddleware(
 
 $application->addMiddleware(
     $container->make(RequestLoggingMiddleware::class)
+);
+
+$application->addMiddleware(
+    $container->make(SecurityHeadersMiddleware::class)
 );
 
 // Handle the HTTP request.
