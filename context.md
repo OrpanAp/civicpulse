@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle, the first HTTP middleware pipeline, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
+**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
 
 ---
 
@@ -493,12 +493,62 @@ The developer ran the following scripts successfully:
 - [x] `git push origin main` succeeded, advancing remote `main` from `0824a02` to `24e9696`.
 
 **Scope and limitations:**
-- This is the initial middleware contract and pipeline only. No request logger, request/correlation ID, security-header middleware, trusted-proxy policy, session service, authentication, or authorization middleware has been implemented.
+- This milestone covers the initial middleware contract and pipeline only. Request IDs and structured HTTP request logging were added in the subsequent milestone documented in section 5.11. Security-header middleware, trusted-proxy policy, session service, authentication, and authorization middleware are not yet implemented.
 - Middleware is registered on each Application instance. Global middleware groups, route-specific middleware, middleware aliases/priorities, and configurable middleware resolution are not implemented.
 - The test script is a standalone PHP test; no PHPUnit dependency or general test runner has been introduced.
 - This milestone does not connect CivicPulse reports to database persistence.
 
 **Definition of Done:** the middleware contract, registration, execution order, response unwinding, short-circuit behavior, no-middleware compatibility, existing HTTP lifecycle regression tests, and container bootstrap regression tests all passed locally. The implementation is committed and pushed as `24e9696`.
+
+### 5.11 HTTP request IDs and structured request logging
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `654cbd7` (`feat: add HTTP request IDs and request logging`).
+
+**Files added:**
+- `framework/src/Http/Middleware/RequestIdMiddleware.php`
+- `framework/src/Http/Middleware/RequestLoggingMiddleware.php`
+- `framework/src/Logging/LoggerInterface.php`
+- `framework/src/Logging/ErrorLogLogger.php`
+- `tests/http_request_logging.php`
+
+**Files modified:**
+- `framework/src/Http/Request.php`
+- `framework/src/Http/Response.php`
+- `bootstrap/app.php`
+- `public/index.php`
+- `tests/bootstrap.php`
+
+**Architecture and behavior:**
+- [x] Added request attributes to `Request` so middleware and downstream handlers can share request-scoped metadata.
+- [x] Added immutable `Response::withHeader()`, replacing an existing header case-insensitively and validating the resulting response through the constructor.
+- [x] Added `RequestIdMiddleware`, which generates a cryptographically secure 128-bit random request ID and stores its 32-character lowercase hexadecimal representation on the Request.
+- [x] Added the `X-Request-ID` response header so clients can correlate a response with server-side logs.
+- [x] Added `LoggerInterface` with a structured level/message/context contract and an `ErrorLogLogger` implementation that writes JSON records through PHP's `error_log()`.
+- [x] Registered the logger as a singleton in the application service container.
+- [x] Registered request-ID middleware before request-logging middleware in the front controller, ensuring the ID is available to log records and is attached to the final response.
+- [x] Logged successful requests at `info` level with request ID, method, path (without query string), response status, and elapsed duration in milliseconds.
+- [x] Logged failed requests at `error` level with request ID, method, path, duration, and exception class. Exception messages are deliberately excluded from the structured context.
+- [x] Made logging best-effort: a logger failure does not interrupt a successful HTTP response and does not replace the original application exception.
+- [x] Preserved exception propagation; the middleware logs and rethrows rather than converting application exceptions into responses.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Syntax checks passed for the ten changed/added PHP files.
+- [x] `php tests/http_request_logging.php` passed all 19 assertions, covering generated and distinct request IDs, response/request ID consistency, structured success and failure records, query-string exclusion, status and duration fields, exception propagation, omission of exception messages, and logging-failure isolation for both successful and failed requests.
+- [x] `php tests/http_middleware.php` passed all six middleware pipeline assertions.
+- [x] `php tests/http_lifecycle.php` passed all eight HTTP lifecycle assertions.
+- [x] `php tests/bootstrap.php` passed all 19 bootstrap assertions, including logger interface resolution and singleton behavior.
+- [x] `git diff --check` and `git diff --cached --check` passed without whitespace errors.
+- [x] Exactly ten intended files were staged and reviewed; the source commit was created as `654cbd7`.
+- [x] `git push origin main` succeeded, advancing remote `main` from `396b827` to `654cbd7`.
+- [x] The developer verified `git status -sb` as `## main...origin/main` and `git log -1 --oneline` as `654cbd7`, confirming the local branch is synchronized and the working tree is clean.
+
+**Scope and limitations:**
+- The current logger writes JSON to PHP's configured error log. File rotation, remote log shipping, retention policy, log levels/configuration, and production observability integration are not implemented.
+- The request ID is generated by the application for each request; accepting and validating externally supplied correlation IDs is not implemented.
+- Security headers, trusted-proxy handling, sessions, authentication, and authorization middleware remain future work.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** request-scoped ID generation, response header propagation, structured success/failure logging, logging-failure isolation, middleware ordering, container registration, and regression compatibility all passed the reported local tests. Source is committed and pushed as `654cbd7`.
 
 ### 5.7 Documentation
 
@@ -600,7 +650,7 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 
 - [x] Middleware contract and pipeline/dispatcher — implemented through `RequestHandlerInterface`, `MiddlewareInterface`, `MiddlewareRequestHandler`, and `MiddlewarePipeline`; see section 5.10.
 - [x] Middleware registration and ordering — `Application::addMiddleware()` registers middleware per application; execution follows registration order and response processing unwinds in reverse order. Short-circuit responses are supported and tested; see section 5.10.
-- [ ] Request logging and correlation/request IDs.
+- [x] Request logging and correlation/request IDs — generated request IDs, response header propagation, structured success/failure logging, and logging-failure isolation implemented and tested; see section 5.11.
 - [ ] Security headers and trusted-proxy handling.
 - [ ] Session abstraction and session middleware.
 - [ ] Authentication and authorization middleware when those features are introduced.
@@ -921,4 +971,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The application foundation and initial HTTP middleware pipeline are implemented, locally tested, committed, and pushed. The latest developer-confirmed source commit is `24e9696` (`feat: add HTTP middleware pipeline`), pushed successfully to `origin/main` from `0824a02`. The middleware suite passed all six assertions, the existing HTTP lifecycle suite passed all eight assertions, and the application bootstrap suite passed all 17 assertions. The next task within Milestone 3 is request logging and correlation/request IDs, followed by security headers and trusted-proxy handling; sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The application foundation, middleware pipeline, request IDs, and structured HTTP request logging are implemented, locally tested, committed, and pushed. The latest developer-confirmed source commit is `654cbd7` (`feat: add HTTP request IDs and request logging`), pushed successfully to `origin/main` from `396b827`. The request-logging suite passed all 19 assertions, the middleware suite passed all six assertions, the HTTP lifecycle suite passed all eight assertions, and the application bootstrap suite passed all 19 assertions. The next task within Milestone 3 is security headers and trusted-proxy handling. Sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
