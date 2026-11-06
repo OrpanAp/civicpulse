@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. Trusted-proxy handling and CivicPulse report persistence are not yet implemented.
+**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, trusted-proxy handling, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet implemented.
 
 ---
 
@@ -602,6 +602,50 @@ The developer ran the following scripts successfully:
 
 **Definition of Done:** all 11 dedicated security-header assertions, the 52 regression assertions across the four existing suites, PHP syntax checks, whitespace checks, and four real HTTP response checks passed as reported by the developer. Source commit `9daac38` is pushed to `origin/main` and the working tree is clean.
 
+### 5.13 Trusted-proxy handling and request network metadata
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `2087a7c` (`Add trusted proxy support`).
+
+**Files added:**
+- `config/trusted_proxies.php`
+- `framework/src/Http/TrustedProxyResolver.php`
+- `tests/request_metadata.php`
+- `tests/trusted_proxy_resolver.php`
+
+**Files modified:**
+- `framework/src/Http/Request.php`
+- `framework/src/Application/Application.php`
+- `tests/bootstrap.php`
+
+**Architecture and behavior:**
+- [x] Added explicit trusted proxy IP/CIDR configuration. The default proxy list is empty, so forwarded metadata is not trusted by default.
+- [x] Added IPv4 and IPv6 exact-address and CIDR matching, including partial-byte network prefixes.
+- [x] Added a dedicated `TrustedProxyResolver` to validate trust and resolve client IP and scheme metadata.
+- [x] Resolve `X-Forwarded-For` only when the immediate connecting peer (`REMOTE_ADDR`) is configured as trusted. Walk the validated chain from right to left, skip trusted proxy hops, and select the first untrusted address. Limit the chain to 20 addresses; malformed chains fall back to the immediate remote address.
+- [x] Accept `X-Forwarded-Proto` only from a trusted immediate proxy and only when it contains one supported `http` or `https` value. Otherwise retain the direct connection scheme.
+- [x] Keep forwarded-host trust disabled by default. When explicitly enabled, accept a validated `X-Forwarded-Host` only from a trusted immediate proxy.
+- [x] Add host syntax validation for direct and forwarded host values, including domain, IPv4, bracketed IPv6, and valid optional port forms. Syntax validation is not a host authorization policy.
+- [x] Expose resolved request metadata through `Request::getClientIp()`, `getScheme()`, `getHost()`, and `isSecure()`.
+- [x] Integrate the resolver into `Request::createFromGlobals()` and Application's container-based construction while preserving the existing `Application(Router)` usage.
+- [x] Harden handling of duplicate security-sensitive forwarded headers: conflicting separately exposed duplicate values are discarded; identical duplicates and valid comma-separated XFF chains are handled deliberately. Ordinary header duplicate behavior remains unchanged.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Eight regression scripts passed: `tests/bootstrap.php`, `tests/container.php`, `tests/trusted_proxy_resolver.php`, `tests/request_metadata.php`, `tests/http_lifecycle.php`, `tests/http_middleware.php`, `tests/http_request_logging.php`, and `tests/http_security_headers.php`.
+- [x] Seven PHP syntax checks passed for `Application.php`, `Request.php`, `TrustedProxyResolver.php`, `config/trusted_proxies.php`, and the three affected/new test files.
+- [x] `git diff --check` reported no whitespace errors.
+- [x] Real HTTP checks using the PHP development server confirmed that spoofed forwarded headers are ignored when no proxy is trusted. With loopback explicitly trusted for the test and forwarded-host trust enabled, the request resolved the supplied test client IP, HTTPS scheme, and forwarded host as expected. The temporary test configuration and route were removed/restored afterward.
+- [x] The developer reviewed and committed the nine-file source change, including replacement of `folder-boilerplate-1.3.1.vsix` with `folder-boilerplate-1.5.0.vsix`.
+- [x] The final source commit was rebased onto the remote deletion commit without force-pushing, then pushed successfully: `2087a7c` (`Add trusted proxy support`). The push advanced remote `main` from `5543634` to `2087a7c`.
+
+**Scope and limitations:**
+- The standardized `Forwarded` header is not supported in this first implementation; the resolver handles the `X-Forwarded-For` and `X-Forwarded-Proto` headers, and optionally `X-Forwarded-Host`.
+- Forwarded-host trust remains opt-in. Host syntax validation does not replace a future application-level host allowlist.
+- If a web server combines duplicate header lines into one value before PHP exposes them, the application cannot recover the original header-line boundaries. The duplicate-header checks cover conflicting duplicate entries PHP exposes separately; XFP and XFH values containing comma-separated ambiguity are rejected by their validators.
+- The implementation has passed local unit/integration and real HTTP checks, but has not been verified in a production reverse-proxy or load-balancer deployment.
+- This milestone does not implement report persistence, sessions, authentication, or authorization.
+
+**Definition of Done:** trusted-proxy configuration, IPv4/IPv6/CIDR matching, forwarded client-IP and scheme resolution, opt-in forwarded-host handling, request metadata accessors, container integration, duplicate forwarded-header hardening, all eight regression scripts, seven syntax checks, and the reported real HTTP checks passed locally. Source commit `2087a7c` is pushed to `origin/main`.
+
 ### 5.7 Documentation
 
 - [x] `README.md` created and committed.
@@ -703,7 +747,7 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 - [x] Middleware registration and ordering — `Application::addMiddleware()` registers middleware per application; execution follows registration order and response processing unwinds in reverse order. Short-circuit responses are supported and tested; see section 5.10.
 - [x] Request logging and correlation/request IDs — generated request IDs, response header propagation, structured success/failure logging, and logging-failure isolation implemented and tested; see section 5.11.
 - [x] Configurable HTTP security headers — implemented and tested; see section 5.12.
-- [ ] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation.
+- [x] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation; implemented and tested locally, including real HTTP checks. See section 5.13.
 - [ ] Session abstraction and session middleware.
 - [ ] Authentication and authorization middleware when those features are introduced.
 
@@ -1022,4 +1066,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The application foundation, middleware pipeline, request IDs, structured HTTP request logging, and configurable HTTP security headers are implemented, locally tested, committed, and pushed to `origin/main`. The latest developer-confirmed source commit is `9daac38` (`Add configurable HTTP security headers`), pushed successfully from `f1dc279`. The security-header suite passed all 11 assertions; regression suites passed with 6 middleware, 19 request-logging, 8 HTTP lifecycle, and 19 bootstrap assertions. Four real HTTP requests verified the configured headers and request IDs on 200, 404, and 405 responses. The working tree is clean and local `main` is synchronized with `origin/main`. The next task within Milestone 3 is trusted-proxy handling: first inspect `Request::createFromGlobals()` and the full Request implementation, then design explicit trusted proxy IP/CIDR configuration and safe forwarded-header parsing before changing code. Do not trust arbitrary `X-Forwarded-*` headers. Sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured request logging, configurable HTTP security headers, and trusted-proxy handling are implemented, locally tested, committed, and pushed to `origin/main`. The latest source commit is `2087a7c` (`Add trusted proxy support`), pushed successfully after rebasing the local trusted-proxy commit onto remote commit `5543634` (`Delete folder-boilerplate-1.3.1.vsix`). The trusted-proxy milestone passed all eight reported regression scripts, seven PHP syntax checks, whitespace validation, and real HTTP checks with both default-untrusted and explicitly trusted proxy configurations; see section 5.13. The next unchecked task within Milestone 3 is a session abstraction and session middleware. Authentication and authorization middleware remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
