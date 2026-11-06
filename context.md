@@ -92,6 +92,21 @@ These rules are important because the earlier learning process spent too much ti
 8. **Keep CivicPulse central.** Framework work should enable the real civic product, not become an endless framework-building exercise.
 9. **Track progress here.** Update the status, decisions, and next actions in this file at the end of meaningful milestones.
 
+
+### 2.1 Repository access and development boundaries
+
+The user confirmed the following access and workflow rules for the CivicPulse repository:
+
+- Repository: https://github.com/OrpanAp/civicpulse
+- Repository files other than `context.md` are read-only for the assistant. The assistant may inspect, read, analyze, and discuss source code, tests, configuration, and documentation, but must not create, edit, delete, or otherwise write those files directly through GitHub.
+- `context.md` is the only repository file the assistant may read and update directly on GitHub. Use it to preserve verified project context, decisions, milestones, and next actions.
+- All source-code development and changes must be performed locally by the user. The assistant should provide instructions and code for the user to apply locally, then review the resulting output.
+- Do not modify `role.md` or any other repository file unless the user explicitly changes this restriction.
+- Before updating `context.md`, fetch its latest version and use its current blob SHA. Preserve the complete existing content and make only the intended, narrowly scoped change.
+- Never claim that local files were changed, tests were run, commits were created, pushes succeeded, or local and remote branches are synchronized unless the user or reliable tool output verifies that result.
+
+These boundaries apply across future CivicPulse development sessions.
+
 ---
 
 ## 3. Current Environment
