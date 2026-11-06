@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
+**Project status:** Early development — HTTP lifecycle, the first HTTP middleware pipeline, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
 
 ---
 
@@ -457,6 +457,49 @@ The developer ran the following scripts successfully:
 - [x] The remote `context.md` update from `0928f10` is included in the history before the application-container commit.
 - [x] No force-push or destructive reset was used.
 
+### 5.10 HTTP middleware contract and pipeline
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Commit: `24e9696` (`feat: add HTTP middleware pipeline`).
+
+**Files added:**
+- `framework/src/Http/Contracts/RequestHandlerInterface.php`
+- `framework/src/Http/Middleware/MiddlewareInterface.php`
+- `framework/src/Http/Middleware/MiddlewareRequestHandler.php`
+- `framework/src/Http/Middleware/MiddlewarePipeline.php`
+- `tests/http_middleware.php`
+
+**Files modified:**
+- `framework/src/Application/Application.php`
+- `framework/src/Routing/Router.php`
+
+**Architecture and behavior:**
+- [x] Added a request-handler contract with `handle(Request): Response`.
+- [x] Added a middleware contract with `process(Request, RequestHandlerInterface): Response`.
+- [x] Added a handler adapter that wraps each middleware and delegates to the next handler.
+- [x] Added a pipeline that wraps the destination in reverse registration order, producing execution in registration order and response unwinding in reverse order.
+- [x] Added per-Application middleware registration through `addMiddleware()`.
+- [x] Made Router implement `RequestHandlerInterface`; its `handle()` delegates to the existing `dispatch()`, preserving the router's existing API and behavior.
+- [x] Preserved the `Application(Router $router)` constructor signature, keeping existing container-based construction compatible.
+- [x] Middleware may return a response without invoking the next handler, allowing short-circuit behavior.
+- [x] Applications with no registered middleware continue to work.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Syntax checks passed for all seven changed/added PHP files.
+- [x] `php tests/http_middleware.php` passed all six assertions: route reaches HTTP 200, original Request is forwarded, registration/response order is correct, middleware can short-circuit with HTTP 401, short-circuit prevents route execution, and an application without middleware still works.
+- [x] `php tests/http_lifecycle.php` passed all eight existing HTTP lifecycle assertions.
+- [x] `php tests/bootstrap.php` passed all 17 application bootstrap assertions, including automatic Application construction through dependency injection.
+- [x] `git diff --check` and `git diff --cached --check` reported no whitespace errors.
+- [x] Seven intended files were staged and reviewed; commit `24e9696` was created successfully.
+- [x] `git push origin main` succeeded, advancing remote `main` from `0824a02` to `24e9696`.
+
+**Scope and limitations:**
+- This is the initial middleware contract and pipeline only. No request logger, request/correlation ID, security-header middleware, trusted-proxy policy, session service, authentication, or authorization middleware has been implemented.
+- Middleware is registered on each Application instance. Global middleware groups, route-specific middleware, middleware aliases/priorities, and configurable middleware resolution are not implemented.
+- The test script is a standalone PHP test; no PHPUnit dependency or general test runner has been introduced.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** the middleware contract, registration, execution order, response unwinding, short-circuit behavior, no-middleware compatibility, existing HTTP lifecycle regression tests, and container bootstrap regression tests all passed locally. The implementation is committed and pushed as `24e9696`.
+
 ### 5.7 Documentation
 
 - [x] `README.md` created and committed.
@@ -555,8 +598,8 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 
 ### Milestone 3 — Middleware and HTTP request pipeline
 
-- [ ] Middleware contract and pipeline/dispatcher.
-- [ ] Middleware registration and ordering.
+- [x] Middleware contract and pipeline/dispatcher — implemented through `RequestHandlerInterface`, `MiddlewareInterface`, `MiddlewareRequestHandler`, and `MiddlewarePipeline`; see section 5.10.
+- [x] Middleware registration and ordering — `Application::addMiddleware()` registers middleware per application; execution follows registration order and response processing unwinds in reverse order. Short-circuit responses are supported and tested; see section 5.10.
 - [ ] Request logging and correlation/request IDs.
 - [ ] Security headers and trusted-proxy handling.
 - [ ] Session abstraction and session middleware.
@@ -878,4 +921,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The initial application foundation is implemented, locally tested, committed, and pushed: environment-file loading, trusted PHP configuration loading/access, dependency injection, service registrations, and container-based front-controller bootstrap. The complete local test run on 2026-11-06 passed the environment (12), configuration repository (12), container (26), bootstrap (17), HTTP lifecycle (8), database configuration (8), database factory (all applicable checks), and MariaDB connection/transaction suites. Four live HTTP smoke tests returned the expected 200, 404, and 405 responses. Commit `e1487fe` is the current synchronized `main`/`origin/main` tip, and the developer confirmed a clean working tree. The next development task is Milestone 3: define the middleware contract and implement the HTTP middleware pipeline, with registration order and request/response flow covered by tests. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The application foundation and initial HTTP middleware pipeline are implemented, locally tested, committed, and pushed. The latest developer-confirmed source commit is `24e9696` (`feat: add HTTP middleware pipeline`), pushed successfully to `origin/main` from `0824a02`. The middleware suite passed all six assertions, the existing HTTP lifecycle suite passed all eight assertions, and the application bootstrap suite passed all 17 assertions. The next task within Milestone 3 is request logging and correlation/request IDs, followed by security headers and trusted-proxy handling; sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
