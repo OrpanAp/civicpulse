@@ -1157,7 +1157,7 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable security headers, trusted-proxy handling, native PHP session infrastructure, and CSRF token/middleware integration have been implemented and locally tested. The trusted-proxy source commit `2087a7c` (`Add trusted proxy support`) is pushed to `origin/main`; the session and CSRF source changes remain local and have not been reported as committed or pushed. The next development milestone is the secure template/view foundation. Begin with a ViewFinder that resolves template names only within approved view directories and rejects traversal attempts; add focused tests before building the compiler and renderer. The intended initial architecture is a public View API, ViewFinder, template Compiler, CompiledViewCache, and ViewRenderer, with compiled PHP stored outside the public directory. The first end-to-end view milestone should render a simple template with automatic HTML escaping and safe cache invalidation. config/app.php does not currently exist; inspect the actual configuration conventions before introducing view configuration. The local inspection also found no resources/ directory or existing view/compiler classes. Authentication and authorization remain later work. CivicPulse report persistence is still not implemented. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while context.md may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with @csrf and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The View/template foundation and its first HTTP integration have now been implemented and locally verified as recorded in section 5.16. The next development milestone is template composition: shared layouts, reusable partials/components, explicit data passing and scope, and tests for nested rendering, escaping, and safe path resolution. Begin by inspecting the current View/Compiler APIs and designing layout/partial behavior that fits the existing compiler rather than adding ambiguous directives. CivicPulse report persistence, authentication, and authorization remain unimplemented. Continue to distinguish local verification from committed/pushed repository state; source changes remain user-managed locally.
 
 ### 5.14 Session abstraction, configuration, and request lifecycle
 
@@ -1230,3 +1230,48 @@ Implemented locally:
 - These results are local developer-reported tests, not production security verification. Session and CSRF changes have not been reported as committed or pushed.
 
 **Definition of Done:** parsed request-body support, token generation and validation, middleware behavior, container registration, middleware ordering, and end-to-end application integration passed the five locally reported test scripts (94 checks). The next milestone is the template/view foundation; the future @csrf directive must render a real hidden form field backed by this existing CSRF token manager.
+
+
+### 5.16 Template/view foundation and first HTML route integration
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. The developer confirmed that the new HTML route works in the browser. Commit/push status for these View and Response changes has not been reported.**
+
+Implemented locally:
+
+- [x] Added the View subsystem under `framework/src/View/`: `View`, `ViewFinder`, `ViewRenderer`, `HtmlEscaper`, `Compiler/Compiler`, `Compiler/CompiledViewCache`, and the View exception classes.
+- [x] `ViewFinder` resolves named templates within the configured `resources/views/` directory and rejects invalid names and traversal outside the approved directory.
+- [x] The template compiler supports escaped `{{ ... }}` expressions and compiles templates to PHP. Templates are trusted application code; the supported expression scanner is not a complete PHP parser.
+- [x] `CompiledViewCache` stores compiled templates in `storage/framework/views/`, uses source/compiler fingerprints for cache identity, writes temporary files, and renames compiled files into place.
+- [x] `ViewRenderer` uses dependency injection for the compiled cache and HTML escaper, executes compiled templates with isolated extracted data, and handles output buffers and rendering exceptions.
+- [x] `View` provides the application-facing `render($name, $data)` API.
+- [x] Registered the View services in `bootstrap/app.php`, including explicit construction of `CompiledViewCache` with the storage path and `ViewFinder` with the resources path. Container tests verify resolution and singleton identity.
+- [x] Added `Response::html()` with the default `text/html; charset=utf-8` content type, optional status code, and custom headers. Existing JSON response behavior remains available.
+- [x] Updated route registration to receive the shared `View` service and added `GET /home`, which renders `resources/views/home.php` and returns an HTML response.
+- [x] Updated `public/index.php` to resolve the shared View service and pass it to the route-registration callback. The Router and Application classes did not need modification.
+- [x] Preserved the existing JSON endpoints: `GET /` and `GET /reports`.
+- [x] Created the first application template, `resources/views/home.php`, with escaped dynamic title, heading, description, status, and year values.
+
+**Developer-reported local test results:**
+
+- [x] `php tests/view_finder.php` — 10 passed; the symlink-specific test was skipped because symlink creation was unavailable in the Windows environment.
+- [x] `php tests/html_escaper.php` — 13 passed.
+- [x] `php tests/view_compiler.php` — 15 passed.
+- [x] `php tests/compiled_view_cache.php` — 11 passed.
+- [x] `php tests/view_renderer.php` — 11 passed.
+- [x] `php tests/view.php` — 8 passed.
+- [x] `php tests/view_container.php` — 13 passed.
+- [x] `php tests/response.php` — 17 passed.
+- [x] All eight listed View/Response test scripts passed: 98 reported checks in total.
+- [x] The developer reported successful browser rendering of `http://127.0.0.1:8000/home` ("works"). The existing JSON routes were intended to remain intact; no separate browser response capture was supplied in this checkpoint.
+
+**Architecture decisions and limitations:**
+
+- Keep rendering in the View subsystem and HTTP representation in `Response`; do not couple the Router or Application directly to template compilation.
+- Pass the shared View service explicitly to route registration. Avoid global service state or a service locator.
+- The compiled view cache is outside the public document root.
+- The compiler supports its documented interpolation syntax only; it is not a full PHP parser and does not support every possible PHP lexical construct.
+- The first `resources/views/home.php` template is a simple standalone page. Shared layouts, partials/components, slots/sections, and asset composition have not yet been implemented.
+- Report persistence, authentication, authorization, and the CivicPulse administrative dashboard remain future work.
+- These are local developer-reported results. Do not claim a source commit, push, clean working tree, or synchronization without subsequent verification.
+
+**Next milestone:** implement shared layouts and reusable partials/components with explicit data passing and predictable scope. Inspect the existing compiler and renderer APIs first, define the smallest coherent composition contract, and add focused tests for nested composition, escaping, data isolation, malformed syntax, and path traversal before expanding the template language.
