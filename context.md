@@ -5,7 +5,7 @@
 **Last updated:** 2026-11-06  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
-**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet connected.
+**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. Trusted-proxy handling and CivicPulse report persistence are not yet implemented.
 
 ---
 
@@ -197,8 +197,7 @@ Implemented behavior:
 - [x] Extracts the URL path from a URI.
 - [x] Parses query-string parameters with PHP's `parse_str()`.
 - [x] Exposes all query parameters through `getQuery()`.
-- [x] Retrieves one query parameter with a default through `getQueryParam()`.
-- [x] Normalizes incoming header names to lowercase.
+- [x] Retrieves one query parameter with a default through `getQueryParam()`.- [x] Normalizes incoming header names to lowercase.
 - [x] Retrieves a header through `getHeader()`.
 - [x] Preserves the raw request body through `getBody()`.
 - [x] Provides `createFromGlobals()` to build a request from PHP's request environment.
@@ -397,8 +396,7 @@ Verified behavior:
 - [x] Environment variable interpolation and shell execution are not performed.
 - [x] Configuration repository loads trusted PHP configuration files from the configured directory.
 - [x] Dotted-key access, defaults, key-existence checks, full configuration retrieval, and preservation of original value types/null values work.
-- [x] Missing configuration directories and configuration files that do not return arrays are rejected.
-- [x] `php tests/environment.php` passed all 12 checks.
+- [x] Missing configuration directories and configuration files that do not return arrays are rejected.- [x] `php tests/environment.php` passed all 12 checks.
 - [x] `php tests/config_repository.php` passed all 12 checks.
 
 **Dependency injection container**
@@ -550,6 +548,45 @@ The developer ran the following scripts successfully:
 
 **Definition of Done:** request-scoped ID generation, response header propagation, structured success/failure logging, logging-failure isolation, middleware ordering, container registration, and regression compatibility all passed the reported local tests. Source is committed and pushed as `654cbd7`.
 
+### 5.12 Configurable HTTP security headers
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `9daac38` (`Add configurable HTTP security headers`).
+
+**Files added:**
+- `config/security.php`
+- `framework/src/Http/Middleware/SecurityHeadersMiddleware.php`
+- `tests/http_security_headers.php`
+
+**Files modified:**
+- `public/index.php`
+
+**Architecture and behavior:**
+- [x] Added centralized `security.headers` configuration, loaded through the existing `ConfigRepository` without adding a separate configuration-loading path.
+- [x] Added `SecurityHeadersMiddleware`, which delegates to the next handler, validates the configured header map and string names/values, then adds headers to the returned immutable Response using `Response::withHeader()`.
+- [x] Configured `X-Content-Type-Options: nosniff`.
+- [x] Configured `X-Frame-Options: DENY`.
+- [x] Configured `Referrer-Policy: strict-origin-when-cross-origin`.
+- [x] Configured `Permissions-Policy: camera=(), microphone=(), geolocation=(self)`; same-origin geolocation is allowed for potential CivicPulse location-reporting functionality.
+- [x] Registered middleware after request-ID and request-logging middleware in the front controller. It decorates normal and short-circuit responses before request logging observes the completed response.
+- [x] Existing response headers are preserved unless a configured header replaces the same header case-insensitively.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] PHP syntax checks passed for `config/security.php`, `framework/src/Http/Middleware/SecurityHeadersMiddleware.php`, `tests/http_security_headers.php`, and `public/index.php`.
+- [x] `php tests/http_security_headers.php` passed all 11 assertions, covering all four configured headers, preservation of existing/unrelated headers, case-insensitive replacement without duplicates, short-circuit response status/header behavior, and rejection of invalid configuration.
+- [x] Regression tests passed: `php tests/http_middleware.php` (6 assertions), `php tests/http_request_logging.php` (19 assertions), `php tests/http_lifecycle.php` (8 assertions), and `php tests/bootstrap.php` (19 assertions).
+- [x] Real HTTP checks using the PHP development server and `curl -i` verified `GET /` (200), `GET /reports` (200), an unknown route (404), and `POST /reports` (405 with `Allow: GET`). All four responses included the four configured security headers and a distinct `X-Request-ID`.
+- [x] `git diff --check` and staged diff checks passed without whitespace errors.
+- [x] Four intended files were reviewed, committed as `9daac38`, and pushed successfully; the developer verified `git status -sb` as `## main...origin/main` and `git log -1 --oneline` as `9daac38`, confirming a clean working tree synchronized with `origin/main`.
+
+**Scope and limitations:**
+- This milestone implements the four configured browser security headers only. Content Security Policy (CSP), HSTS, and other deployment-specific headers are not configured.
+- Trusted-proxy handling is not implemented. Forwarded client IP, host, and scheme headers must not be trusted until explicit proxy trust configuration and address/chain validation are designed and tested.
+- The middleware decorates responses returned through the normal application pipeline, including tested 404 and 405 responses. The request-logging middleware still rethrows unhandled application exceptions; centralized exception-to-response handling is not yet implemented, so do not claim that this middleware guarantees headers on unhandled exception responses.
+- No production HTTPS or reverse-proxy deployment verification has been performed.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** all 11 dedicated security-header assertions, the 52 regression assertions across the four existing suites, PHP syntax checks, whitespace checks, and four real HTTP response checks passed as reported by the developer. Source commit `9daac38` is pushed to `origin/main` and the working tree is clean.
+
 ### 5.7 Documentation
 
 - [x] `README.md` created and committed.
@@ -597,8 +634,7 @@ Browser
 
 ### Local verification reported by the developer
 
-- [x] `git status --short` returned no output before these checks, indicating a clean working tree at that point.
-- [x] PHP syntax checks passed for all seven implementation/test files.
+- [x] `git status --short` returned no output before these checks, indicating a clean working tree at that point.- [x] PHP syntax checks passed for all seven implementation/test files.
 - [x] `php tests/http_lifecycle.php` passed all eight assertions.
 - [x] PHP development server started with `php -S localhost:8000 -t public public/router.php`.
 - [x] `GET /` returned HTTP 200 and the CivicPulse JSON response.
@@ -651,7 +687,8 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 - [x] Middleware contract and pipeline/dispatcher — implemented through `RequestHandlerInterface`, `MiddlewareInterface`, `MiddlewareRequestHandler`, and `MiddlewarePipeline`; see section 5.10.
 - [x] Middleware registration and ordering — `Application::addMiddleware()` registers middleware per application; execution follows registration order and response processing unwinds in reverse order. Short-circuit responses are supported and tested; see section 5.10.
 - [x] Request logging and correlation/request IDs — generated request IDs, response header propagation, structured success/failure logging, and logging-failure isolation implemented and tested; see section 5.11.
-- [ ] Security headers and trusted-proxy handling.
+- [x] Configurable HTTP security headers — implemented and tested; see section 5.12.
+- [ ] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation.
 - [ ] Session abstraction and session middleware.
 - [ ] Authentication and authorization middleware when those features are introduced.
 
@@ -797,8 +834,7 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 **Planned template syntax / developer shortcuts (Laravel-inspired in ergonomics, independently designed and implemented):**
 
 - [ ] `@csrf` — render the hidden CSRF token field.
-- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.
-- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
+- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
 - [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
 - [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials.
 - [ ] `@components("component.php")` — proposed component-rendering syntax for reusable, parameterized UI components; define its exact naming, data/slot, escaping, and nesting contract before implementation.
@@ -971,4 +1007,4 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The application foundation, middleware pipeline, request IDs, and structured HTTP request logging are implemented, locally tested, committed, and pushed. The latest developer-confirmed source commit is `654cbd7` (`feat: add HTTP request IDs and request logging`), pushed successfully to `origin/main` from `396b827`. The request-logging suite passed all 19 assertions, the middleware suite passed all six assertions, the HTTP lifecycle suite passed all eight assertions, and the application bootstrap suite passed all 19 assertions. The next task within Milestone 3 is security headers and trusted-proxy handling. Sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
+**Current next action:** The application foundation, middleware pipeline, request IDs, structured HTTP request logging, and configurable HTTP security headers are implemented, locally tested, committed, and pushed to `origin/main`. The latest developer-confirmed source commit is `9daac38` (`Add configurable HTTP security headers`), pushed successfully from `f1dc279`. The security-header suite passed all 11 assertions; regression suites passed with 6 middleware, 19 request-logging, 8 HTTP lifecycle, and 19 bootstrap assertions. Four real HTTP requests verified the configured headers and request IDs on 200, 404, and 405 responses. The working tree is clean and local `main` is synchronized with `origin/main`. The next task within Milestone 3 is trusted-proxy handling: first inspect `Request::createFromGlobals()` and the full Request implementation, then design explicit trusted proxy IP/CIDR configuration and safe forwarded-header parsing before changing code. Do not trust arbitrary `X-Forwarded-*` headers. Sessions and authentication/authorization middleware remain later work. Keep database credentials out of committed files and test output. Do not edit source files on GitHub; coding remains local, while `context.md` may be updated directly on GitHub at verified milestones. The confirmed long-term scope includes additional relational engines, separate Redis/cache/queue/session/lock/rate-limit adapters, MongoDB/document storage, a migration and seeding system, a fluent schema builder, models/relationships/query APIs, model factories, configurable resource/component generators, CLI commands, a secure template engine with `@csrf` and related directives, framework helper shortcuts, rate limiting, application/database load balancing, and production observability. Treat every item as planned until implemented and tested; maintain per-driver support and generated-resource test matrices, and never check off an adapter or feature based only on a class file or syntax check.
