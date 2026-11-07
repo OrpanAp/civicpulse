@@ -2,7 +2,7 @@
 
 > **Purpose of this file:** Preserve the project's original motivation, current technical state, decisions, and next actions. Update this file as work is completed so development can continue across sessions without relying on chat history.
 
-**Last updated:** 2026-11-06  
+**Last updated:** 2026-11-07  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
 **Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, trusted-proxy handling, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet implemented.
@@ -102,6 +102,7 @@ The user confirmed the following access and workflow rules for the CivicPulse re
 - `context.md` is the only repository file the assistant may read and update directly on GitHub. Use it to preserve verified project context, decisions, milestones, and next actions.
 - All source-code development and changes must be performed locally by the user. The assistant should provide instructions and code for the user to apply locally, then review the resulting output.
 - Do not modify `role.md` or any other repository file unless the user explicitly changes this restriction.
+- Application templates must use the project's supported template directives for composition and rendering. Do not instruct the developer to embed raw PHP rendering calls such as `<?= $view->render(...) ?>` in application templates; PHP generated internally by the compiler is a separate implementation detail.
 - Before updating `context.md`, fetch its latest version and use its current blob SHA. Preserve the complete existing content and make only the intended, narrowly scoped change.
 - Never claim that local files were changed, tests were run, commits were created, pushes succeeded, or local and remote branches are synchronized unless the user or reliable tool output verifies that result.
 
@@ -228,9 +229,9 @@ civicpulse/
 
 **Observed absences at this checkpoint:** app/ and resources/ did not exist in the developer's local directory listing. config/app.php was also absent. The Composer App namespace PSR-4 mapping exists, but that mapping alone does not mean the app/ directory has been created. The local working tree contained uncommitted and untracked session/CSRF changes; the developer had not reported them as committed or pushed.
 
-### 4.1 Planned template/view directory structure
+### 4.1 Current template/view structure — locally observed
 
-The following is the proposed target structure for the upcoming template/view milestone. These directories and files are **planned, not yet created or implemented**. Create them locally in stages as each component is developed and tested.
+The following View subsystem structure was reported from the developer's local working tree on 2026-11-07. It records local implementation and must not be read as proof that these source files have been committed or pushed to GitHub.
 
 ```text
 framework/
@@ -239,6 +240,8 @@ framework/
         ├── View.php
         ├── ViewFinder.php
         ├── ViewRenderer.php
+        ├── HtmlEscaper.php
+        ├── ViewCompositionContext.php
         ├── Compiler/
         │   ├── Compiler.php
         │   └── CompiledViewCache.php
@@ -248,24 +251,27 @@ framework/
 
 resources/
 └── views/
+    └── partials/
 
 storage/
 └── framework/
     └── views/
 ```
 
-**Planned responsibilities:**
+**Current responsibilities:**
 
-- View: public rendering API.
-- ViewFinder: resolve template names only inside approved view directories and reject traversal attempts.
-- Compiler: compile the supported template language into PHP without evaluating arbitrary user-provided PHP expressions.
-- CompiledViewCache: store compiled templates outside the public directory and invalidate them safely when source templates or compiler behavior changes.
-- ViewRenderer: execute compiled templates and capture rendered output.
-- ViewException and ViewNotFoundException: provide explicit, predictable template error types.
-- resources/views/: hold application view templates.
-- storage/framework/views/: hold generated compiled templates; this runtime directory must not be publicly accessible.
+- `View`: application-facing rendering API.
+- `ViewFinder`: resolves templates inside approved view directories and rejects invalid names and traversal attempts.
+- `Compiler`: compiles the supported template directives and escaped interpolations into PHP; it is not a complete PHP parser.
+- `CompiledViewCache`: stores generated templates outside the public document root and manages compiled-cache identity.
+- `ViewRenderer`: executes compiled templates, captures output, and manages rendering failures.
+- `HtmlEscaper`: provides the default HTML-escaping behavior for interpolated values.
+- `ViewCompositionContext`: tracks state needed for layout/section composition.
+- `resources/views/`: application templates, including the partials directory.
+- `storage/framework/views/`: generated compiled templates; this runtime directory must not be publicly accessible.
 
-This is an architectural proposal, not a requirement to create every class immediately. The first implementation step is ViewFinder plus focused path-resolution and traversal tests.
+The structure above is a developer-reported local snapshot. Check the local working tree before assuming every listed item is present in the remote branch.
+
 ## 5. Implemented Work — Verified Repository State
 
 This section records what exists in the repository as of the date above.
@@ -1159,7 +1165,7 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** The View/template foundation and its first HTTP integration have now been implemented and locally verified as recorded in section 5.16. The next development milestone is template composition: shared layouts, reusable partials/components, explicit data passing and scope, and tests for nested rendering, escaping, and safe path resolution. Begin by inspecting the current View/Compiler APIs and designing layout/partial behavior that fits the existing compiler rather than adding ambiguous directives. CivicPulse report persistence, authentication, and authorization remain unimplemented. Continue to distinguish local verification from committed/pushed repository state; source changes remain user-managed locally.
+**Current next action:** Continue from the locally implemented View composition and conditional-directive milestone in section 5.17. Inspect the current local compiler, renderer, and composition context before extending the language. The next design work is the distinct contracts for parameterized `@components`, component-scoped resource registration through `@call`, and safe stored-markup rendering through `@build`; do not conflate these features or treat the roadmap syntax as implemented. CivicPulse report persistence, authentication, and authorization remain unimplemented. Continue to distinguish local verification from committed/pushed repository state; source changes remain user-managed locally.
 
 ### 5.14 Session abstraction, configuration, and request lifecycle
 
@@ -1272,8 +1278,43 @@ Implemented locally:
 - Pass the shared View service explicitly to route registration. Avoid global service state or a service locator.
 - The compiled view cache is outside the public document root.
 - The compiler supports its documented interpolation syntax only; it is not a full PHP parser and does not support every possible PHP lexical construct.
-- The first `resources/views/home.php` template is a simple standalone page. Shared layouts, partials/components, slots/sections, and asset composition have not yet been implemented.
+- The first `resources/views/home.php` template was initially a standalone page. Shared layout/section composition and partial inclusion were implemented in the subsequent local milestone recorded in section 5.17. A separate parameterized component system and component-scoped asset composition remain planned.
 - Report persistence, authentication, authorization, and the CivicPulse administrative dashboard remain future work.
 - These are local developer-reported results. Do not claim a source commit, push, clean working tree, or synchronization without subsequent verification.
 
-**Next milestone:** implement shared layouts and reusable partials/components with explicit data passing and predictable scope. Inspect the existing compiler and renderer APIs first, define the smallest coherent composition contract, and add focused tests for nested composition, escaping, data isolation, malformed syntax, and path traversal before expanding the template language.
+**Next milestone:** continue the template-language roadmap from the implemented composition and conditional foundation. Inspect the current compiler, renderer, and composition context before designing the still-planned parameterized `@components`, resource-registration `@call`, and safe stored-markup `@build` directives. Keep their responsibilities distinct and define parsing, scope, caching, and security contracts before implementation.
+
+### 5.17 Template composition and conditional directives
+
+**Status: Implemented and locally verified by the developer on 2026-11-07. These View/compiler changes remain local; no source commit or push has been reported.**
+
+Implemented locally:
+
+- [x] Added layout inheritance with `@extends(...)`, named sections with `@section(...)` / `@endsection`, and layout placeholders with `@yield(...)`.
+- [x] Added partial inclusion through `@include(...)`, using the template language rather than raw PHP rendering calls in application templates.
+- [x] Added a composition context to manage layout/section state during rendering and support nested composition.
+- [x] Kept template data passing and rendering within the View subsystem; application templates must not call `$view->render(...)` directly through raw PHP snippets.
+- [x] Added `@if(...)`, `@elseif(...)`, `@else`, and `@endif` conditional directives.
+- [x] Supported nested conditional blocks and validated directive ordering: `@elseif` requires an open conditional and cannot follow `@else`; `@else` may occur only once; `@endif` closes the most recently opened conditional.
+- [x] Added validation for empty conditions, malformed/multiple arguments, unexpected closing/branch directives, duplicate `@else`, `@elseif` after `@else`, and unclosed conditional blocks.
+- [x] Kept escaped `{{ ... }}` interpolation behavior available inside conditional branches.
+- [x] Extended compiler parsing to account for nested delimiters and quoted strings when locating directive argument boundaries.
+
+**Developer-reported local verification:**
+
+- [x] `php -l tests/view.php` — no syntax errors; the View integration suite reported 13 passed, 0 failed.
+- [x] `php -l tests/view_renderer.php` — no syntax errors; the ViewRenderer suite reported 11 passed, 0 failed.
+- [x] `php -l tests/view_compiler.php` — no syntax errors; after removing a duplicate test, the compiler suite was rerun and reported 53 passed, 0 failed.
+- [x] `php -l tests/view_composition.php` — no syntax errors; the composition suite reported 20 passed, 0 failed.
+- [x] The latest reported per-suite results therefore sum to 97 passed, 0 failed. The compiler suite was rerun after its duplicate-test cleanup; the other three suite outputs were from the immediately preceding full View-suite run and were not rerun after that cleanup.
+
+**Architecture decisions and limitations:**
+
+- Keep template composition and conditional parsing in the compiler/View subsystem; do not move template rendering into route handlers or the Router.
+- Application templates use the supported directives such as `@extends`, `@section`, `@yield`, and `@include`. Do not use raw PHP calls such as `<?= $view->render(...) ?>` to compose application templates.
+- The compiler translates supported template syntax into PHP. Generated PHP is an internal compilation output, not a reason to expose arbitrary PHP execution or bypass template escaping.
+- The compiler's expression scanner is deliberately not described as a complete PHP parser. Continue to test nested delimiters, quoted strings, malformed expressions, and directive nesting.
+- The roadmap directives `@components`, `@call`, and `@build` remain planned, not implemented. Their responsibilities remain separate: reusable parameterized templates, controlled component resource registration, and safe rendering of supported stored markup, respectively.
+- These are local developer-reported results. Do not claim that the View source changes are committed, pushed, or synchronized with GitHub.
+
+**Definition of Done:** layout/section composition, partial inclusion, nested conditionals, conditional syntax validation, and escaped interpolation within branches were implemented locally. The latest reported results are 97 passing tests across the four View integration, renderer, compiler, and composition suites, with the verification timing caveat recorded above.
