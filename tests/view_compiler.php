@@ -158,6 +158,323 @@ $assertThrows(
     'Rejects unexpected closing braces'
 );
 
+// Test 16: Compile an include without explicit data.
+$assert(
+    $compiler->compile(
+        "@include('partials/header')"
+    ) === "<?= \$view->render('partials/header') ?>",
+    'Compiles an include without explicit data'
+);
+
+// Test 17: Compile an include with explicit data.
+$assert(
+    $compiler->compile(
+        "@include('partials/header', ['siteName' => \$siteName])"
+    ) === "<?= \$view->render('partials/header', ['siteName' => \$siteName]) ?>",
+    'Compiles an include with explicit data'
+);
+
+// Test 18: Compile nested expressions in include data.
+$assert(
+    $compiler->compile(
+        "@include('partials/navigation', ['label' => strtoupper(trim(\$label))])"
+    ) === "<?= \$view->render('partials/navigation', ['label' => strtoupper(trim(\$label))]) ?>",
+    'Compiles nested expressions in include data'
+);
+
+// Test 19: Reject an unquoted view name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@include(partials/header)'
+    ),
+    'Rejects an unquoted include view name'
+);
+
+// Test 20: Reject a dynamic view name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@include(\$partialName)"
+    ),
+    'Rejects a dynamic include view name'
+);
+
+// Test 21: Reject more than two arguments.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@include('partials/header', [], 'extra')"
+    ),
+    'Rejects extra include arguments'
+);
+
+// Test 22: Reject a non-array data argument.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@include('partials/header', \$data)"
+    ),
+    'Rejects implicit or variable include data'
+);
+
+// Test 23: Reject an unclosed include directive.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@include('partials/header'"
+    ),
+    'Rejects an unclosed include directive'
+);
+
+// Test 24: Reject an empty include argument.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@include('partials/header', )"
+    ),
+    'Rejects an empty include argument'
+);
+
+// Test 25: Compile a layout declaration without data.
+$assert(
+    $compiler->compile(
+        "@extends('layouts/app')"
+    ) === "<?php \$__viewContext->extend('layouts/app', []); ?>",
+    'Compiles a layout declaration without data'
+);
+
+// Test 26: Compile a layout declaration with explicit data.
+$assert(
+    $compiler->compile(
+        "@extends('layouts/app', ['title' => \$title])"
+    ) === "<?php \$__viewContext->extend('layouts/app', ['title' => \$title]); ?>",
+    'Compiles a layout declaration with explicit data'
+);
+
+// Test 27: Compile a section declaration.
+$assert(
+    $compiler->compile(
+        "@section('content')"
+    ) === "<?php \$__viewContext->startSection('content'); ?>",
+    'Compiles a section declaration'
+);
+
+// Test 28: Compile an ending section directive.
+$assert(
+    $compiler->compile(
+        '@endsection'
+    ) === "<?php \$__viewContext->endSection(); ?>",
+    'Compiles an ending section directive'
+);
+
+// Test 29: Compile a yield directive.
+$assert(
+    $compiler->compile(
+        "@yield('content')"
+    ) === "<?= \$__viewContext->yieldSection('content') ?>",
+    'Compiles a yield directive'
+);
+
+// Test 30: Reject an unquoted layout name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@extends(layouts/app)'
+    ),
+    'Rejects an unquoted layout name'
+);
+
+// Test 31: Reject a dynamic layout name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@extends($layout)'
+    ),
+    'Rejects a dynamic layout name'
+);
+
+// Test 32: Reject more than two layout arguments.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@extends('layouts/app', [], 'extra')"
+    ),
+    'Rejects extra layout arguments'
+);
+
+// Test 33: Reject non-array layout data.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@extends('layouts/app', \$data)"
+    ),
+    'Rejects variable layout data'
+);
+
+// Test 34: Reject an unclosed layout declaration.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@extends('layouts/app'"
+    ),
+    'Rejects an unclosed layout declaration'
+);
+
+// Test 35: Reject an empty section name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@section('')"
+    ),
+    'Rejects an empty section name'
+);
+
+// Test 36: Reject an unclosed yield directive.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@yield('content'"
+    ),
+    'Rejects an unclosed yield directive'
+);
+
+// Test 37: Compile a basic if directive.
+$assert(
+    $compiler->compile(
+        '@if($condition)Yes@endif'
+    ) === '<?php if ($condition): ?>'
+        . 'Yes'
+        . '<?php endif; ?>',
+    'Compiles a basic if directive'
+);
+
+// Test 38: Compile an elseif directive.
+$assert(
+    $compiler->compile(
+        '@if($condition)First@elseif($otherCondition)Second@endif'
+    ) === '<?php if ($condition): ?>'
+        . 'First'
+        . '<?php elseif ($otherCondition): ?>'
+        . 'Second'
+        . '<?php endif; ?>',
+    'Compiles an elseif directive'
+);
+
+// Test 39: Compile an else directive.
+$assert(
+    $compiler->compile(
+        '@if($condition)First@elseSecond@endif'
+    ) === '<?php if ($condition): ?>'
+        . 'First'
+        . '<?php else: ?>'
+        . 'Second'
+        . '<?php endif; ?>',
+    'Compiles an else directive'
+);
+
+// Test 40: Compile an endif directive.
+$assert(
+    $compiler->compile(
+        '@if($condition)Content@endif'
+    ) === '<?php if ($condition): ?>'
+        . 'Content'
+        . '<?php endif; ?>',
+    'Compiles an endif directive'
+);
+
+// Test 41: Compile nested conditional directives.
+$assert(
+    $compiler->compile(
+        '@if($first)@if($second)Inside@endif@endif'
+    ) === '<?php if ($first): ?>'
+        . '<?php if ($second): ?>'
+        . 'Inside'
+        . '<?php endif; ?>'
+        . '<?php endif; ?>',
+    'Compiles nested conditional directives'
+);
+
+// Test 42: Support complex conditions with nested expressions.
+$assert(
+    $compiler->compile(
+        "@if(is_string(\$user['name']) && strlen(\$user['name']) > 0)"
+            . 'Valid'
+            . '@endif'
+    ) === "<?php if (is_string(\$user['name']) && strlen(\$user['name']) > 0): ?>"
+        . 'Valid'
+        . '<?php endif; ?>',
+    'Compiles conditions containing nested expressions'
+);
+
+// Test 43: Support arrays and quoted strings in elseif conditions.
+$assert(
+    $compiler->compile(
+        "@if(\$role === 'guest')Guest"
+            . "@elseif(in_array(\$role, ['admin', 'editor'], true))"
+            . 'Authorized'
+            . '@endif'
+    ) === "<?php if (\$role === 'guest'): ?>"
+        . 'Guest'
+        . "<?php elseif (in_array(\$role, ['admin', 'editor'], true)): ?>"
+        . 'Authorized'
+        . '<?php endif; ?>',
+    'Compiles elseif conditions containing arrays and strings'
+);
+
+// Test 44: Reject an empty if condition.
+$assertThrows(
+    static fn() => $compiler->compile('@if()'),
+    'Rejects an empty if condition'
+);
+
+// Test 45: Reject an unclosed if directive.
+$assertThrows(
+    static fn() => $compiler->compile('@if($condition'),
+    'Rejects an unclosed if directive'
+);
+
+// Test 46: Reject an empty elseif condition.
+$assertThrows(
+    static fn() => $compiler->compile('@elseif()'),
+    'Rejects an empty elseif condition'
+);
+
+// Test 47: Reject multiple top-level if arguments.
+$assertThrows(
+    static fn() => $compiler->compile('@if($first, $second)'),
+    'Rejects multiple if arguments'
+);
+
+// Test 48: Reject else without an open if.
+$assertThrows(
+    static fn() => $compiler->compile('@else'),
+    'Rejects else without an open if'
+);
+
+// Test 49: Reject elseif without an open if.
+$assertThrows(
+    static fn() => $compiler->compile('@elseif($condition)'),
+    'Rejects elseif without an open if'
+);
+
+// Test 50: Reject endif without an open if.
+$assertThrows(
+    static fn() => $compiler->compile('@endif'),
+    'Rejects endif without an open if'
+);
+
+// Test 51: Reject duplicate else directives.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@if($condition)@else@else@endif'
+    ),
+    'Rejects duplicate else directives'
+);
+
+// Test 52: Reject elseif after else.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@if($condition)@else@elseif($otherCondition)@endif'
+    ),
+    'Rejects elseif after else'
+);
+
+// Test 53: Reject an unclosed conditional block.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@if($condition)Content'
+    ),
+    'Rejects an unclosed conditional block'
+);
+
 echo "\nPassed: {$passed}\n";
 echo "Failed: {$failed}\n";
 

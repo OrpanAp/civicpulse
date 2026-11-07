@@ -24,17 +24,20 @@ return static function (
         }
     );
 
-    // New HTML page.
+    // New HTML page using the shared application layout.
     $router->get(
         '/home',
         static function (Request $request) use ($view): Response {
-            $html = $view->render('home', [
-                'title' => 'CivicPulse - Community Infrastructure',
-                'heading' => 'Building Better Communities Together',
-                'description' => 'CivicPulse helps communities report and track local infrastructure problems, making it easier to identify issues and improve public services.',
-                'status' => 'Platform is running',
-                'year' => date('Y'),
-            ]);
+            $html = $view->render(
+                'home',
+                [
+                    'title' => 'CivicPulse - Community Infrastructure',
+                    'year' => date('Y'),
+                    'heading' => 'Building Better Communities Together',
+                    'description' => 'CivicPulse helps communities report and track local infrastructure problems, making it easier to identify issues and improve public services.',
+                    'status' => 'Platform is running',
+                ]
+            );
 
             return Response::html($html);
         }

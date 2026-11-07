@@ -90,6 +90,21 @@ try {
     );
 
     file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'conditional.php',
+        '@if($show)'
+            . '@if($isAdmin)'
+            . '<strong>{{ $name }}</strong>'
+            . '@else'
+            . '<span>{{ $name }}</span>'
+            . '@endif'
+            . '@elseif($role === \'guest\')'
+            . '<p>Guest</p>'
+            . '@else'
+            . '<p>Hidden</p>'
+            . '@endif'
+    );
+
+    file_put_contents(
         $viewsPath . DIRECTORY_SEPARATOR . 'reports'
             . DIRECTORY_SEPARATOR . 'index.php',
         '<h1>Reports</h1>'
@@ -181,6 +196,86 @@ try {
         'Wraps template execution errors through View'
     );
 
+    // Test 8: Execute a true nested conditional branch.
+    $output = $view->render(
+        'conditional',
+        [
+            'show' => true,
+            'isAdmin' => true,
+            'role' => 'admin',
+            'name' => 'Administrator',
+        ]
+    );
+
+    $assert(
+        $output === '<strong>Administrator</strong>',
+        'Executes a true nested conditional branch'
+    );
+
+    // Test 9: Execute the nested else branch.
+    $output = $view->render(
+        'conditional',
+        [
+            'show' => true,
+            'isAdmin' => false,
+            'role' => 'admin',
+            'name' => 'Regular User',
+        ]
+    );
+
+    $assert(
+        $output === '<span>Regular User</span>',
+        'Executes the nested else branch'
+    );
+
+    // Test 10: Execute the elseif branch.
+    $output = $view->render(
+        'conditional',
+        [
+            'show' => false,
+            'isAdmin' => false,
+            'role' => 'guest',
+            'name' => 'Guest',
+        ]
+    );
+
+    $assert(
+        $output === '<p>Guest</p>',
+        'Executes the elseif branch'
+    );
+
+    // Test 11: Execute the final else branch.
+    $output = $view->render(
+        'conditional',
+        [
+            'show' => false,
+            'isAdmin' => false,
+            'role' => 'member',
+            'name' => 'Member',
+        ]
+    );
+
+    $assert(
+        $output === '<p>Hidden</p>',
+        'Executes the final else branch'
+    );
+
+    // Test 12: Escape dynamic HTML inside a conditional.
+    $output = $view->render(
+        'conditional',
+        [
+            'show' => true,
+            'isAdmin' => true,
+            'role' => 'admin',
+            'name' => '<script>alert("XSS")</script>',
+        ]
+    );
+
+    $assert(
+        $output === '<strong>&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;</strong>',
+        'Escapes dynamic HTML inside a conditional branch'
+    );
+
     $assert(
         $exception?->getPrevious() instanceof RuntimeException,
         'Preserves the original template exception'
@@ -209,6 +304,7 @@ try {
         $viewsPath . DIRECTORY_SEPARATOR . 'home.php',
         $viewsPath . DIRECTORY_SEPARATOR . 'welcome.php',
         $viewsPath . DIRECTORY_SEPARATOR . 'escaped.php',
+        $viewsPath . DIRECTORY_SEPARATOR . 'conditional.php',
         $viewsPath . DIRECTORY_SEPARATOR . 'reports'
             . DIRECTORY_SEPARATOR . 'index.php',
         $viewsPath . DIRECTORY_SEPARATOR . 'broken.php',

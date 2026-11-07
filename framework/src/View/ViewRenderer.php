@@ -17,10 +17,13 @@ class ViewRenderer
 
     public function render(
         string $path,
-        array $data = []
+        array $data = [],
+        ?View $view = null,
+        ?ViewCompositionContext $viewContext = null
     ): string {
-        // Compile the original template or reuse its cached version.
         $compiledPath = $this->compiledViewCache->compile($path);
+
+        $viewContext ??= new ViewCompositionContext();
 
         $initialBufferLevel = ob_get_level();
 
@@ -35,7 +38,9 @@ class ViewRenderer
                 string $__viewPath,
                 string $__compiledViewPath,
                 array $__viewData,
-                HtmlEscaper $__escaper
+                HtmlEscaper $__escaper,
+                ?View $view,
+                ViewCompositionContext $__viewContext
             ): void {
                 extract(
                     $__viewData,
@@ -47,7 +52,9 @@ class ViewRenderer
                 $path,
                 $compiledPath,
                 $data,
-                $this->escaper
+                $this->escaper,
+                $view,
+                $viewContext
             );
 
             $rendererBufferLevel = $initialBufferLevel + 1;
