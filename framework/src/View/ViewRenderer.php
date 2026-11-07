@@ -6,6 +6,7 @@ namespace CivicPulse\Framework\View;
 
 use CivicPulse\Framework\View\Compiler\CompiledViewCache;
 use CivicPulse\Framework\View\Exceptions\ViewException;
+use CivicPulse\Framework\View\Exceptions\ViewNotFoundException;
 use Throwable;
 
 class ViewRenderer
@@ -19,13 +20,18 @@ class ViewRenderer
         string $path,
         array $data = [],
         ?View $view = null,
-        ?ViewCompositionContext $viewContext = null
+        ?ViewCompositionContext $viewContext = null,
+        ?ComponentContext $componentContext = null
     ): string {
         $compiledPath = $this->compiledViewCache->compile($path);
 
         $viewContext ??= new ViewCompositionContext();
 
+        $componentContext ??= new ComponentContext();
+
         $initialBufferLevel = ob_get_level();
+
+        $initialComponentDepth = $componentContext->invocationDepth();
 
         if (!ob_start()) {
             throw new ViewException(
@@ -40,7 +46,8 @@ class ViewRenderer
                 array $__viewData,
                 HtmlEscaper $__escaper,
                 ?View $view,
-                ViewCompositionContext $__viewContext
+                ViewCompositionContext $__viewContext,
+                ComponentContext $__componentContext
             ): void {
                 extract(
                     $__viewData,
@@ -54,7 +61,8 @@ class ViewRenderer
                 $data,
                 $this->escaper,
                 $view,
-                $viewContext
+                $viewContext,
+                $componentContext
             );
 
             $rendererBufferLevel = $initialBufferLevel + 1;
@@ -93,6 +101,16 @@ class ViewRenderer
                 if (!ob_end_clean()) {
                     break;
                 }
+            }
+
+            // Remove only component invocations created by this render.
+            $componentContext->abortInvocationsToDepth(
+                $initialComponentDepth
+            );
+
+            // Preserve the specific exception for missing views/components.
+            if ($exception instanceof ViewNotFoundException) {
+                throw $exception;
             }
 
             throw new ViewException(

@@ -19,6 +19,7 @@ use CivicPulse\Framework\View\HtmlEscaper;
 use CivicPulse\Framework\View\View;
 use CivicPulse\Framework\View\ViewFinder;
 use CivicPulse\Framework\View\ViewRenderer;
+use CivicPulse\Framework\View\ComponentRenderer;
 
 $basePath = dirname(__DIR__);
 
@@ -103,6 +104,9 @@ $container->singleton(
 // The renderer receives CompiledViewCache and HtmlEscaper
 // through the container's automatic constructor injection.
 $container->singleton(ViewRenderer::class);
+
+// Render reusable components with their props and slots.
+$container->singleton(ComponentRenderer::class);
 
 // The main View service receives ViewFinder and ViewRenderer.
 $container->singleton(View::class);

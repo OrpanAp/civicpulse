@@ -16,15 +16,21 @@ final class Compiler
         $position = 0;
 
         $conditionalStack = [];
+        $componentStack = [];
 
         $directives = [
+            '@components(',
+            '@renderSlot(',
             '@include(',
             '@extends(',
             '@section(',
             '@yield(',
-            '@endsection',
             '@elseif(',
+            '@slot(',
+            '@endcomponents',
+            '@endslot',
             '@if(',
+            '@endsection',
             '@else',
             '@endif',
         ];
@@ -122,6 +128,64 @@ final class Compiler
                 continue;
             }
 
+            // Compile @endslot.
+            if ($nextDirective === '@endslot') {
+                if ($componentStack === []) {
+                    throw new ViewException(
+                        '@endslot must appear inside a @components block.'
+                    );
+                }
+
+                $componentIndex = array_key_last($componentStack);
+
+                if ($componentStack[$componentIndex]['activeSlot'] === null) {
+                    throw new ViewException(
+                        '@endslot does not have a matching @slot.'
+                    );
+                }
+
+                $componentStack[$componentIndex]['activeSlot'] = null;
+
+                $compiled .= '<?php $__componentContext->endSlot(); ?>';
+
+                $position = $nextPosition + strlen('@endslot');
+                continue;
+            }
+
+            // Compile @endcomponents.
+            if ($nextDirective === '@endcomponents') {
+                if ($componentStack === []) {
+                    throw new ViewException(
+                        '@endcomponents does not have a matching @components.'
+                    );
+                }
+
+                $componentIndex = array_key_last($componentStack);
+
+                if ($componentStack[$componentIndex]['activeSlot'] !== null) {
+                    throw new ViewException(
+                        'A named slot must be closed before @endcomponents.'
+                    );
+                }
+
+                array_pop($componentStack);
+
+                $compiled .= <<<'PHP'
+                    <?= (static function (array $__invocation) use ($view, $__componentContext, $__viewContext): string {
+                        return $view->renderComponent(
+                            $__invocation['name'],
+                            $__invocation['props'],
+                            $__invocation['slots'],
+                            $__componentContext,
+                            $__viewContext
+                        );
+                    })($__componentContext->end()) ?>
+                    PHP;
+
+                $position = $nextPosition + strlen('@endcomponents');
+                continue;
+            }
+
             // Compile @endsection.
             if ($nextDirective === '@endsection') {
                 $compiled .= '<?php $__viewContext->endSection(); ?>';
@@ -185,13 +249,135 @@ final class Compiler
                 );
             }
 
-            $arguments = $this->splitDirectiveArguments(
-                substr(
-                    $template,
-                    $directiveArgumentsStart,
-                    $closingPosition - $directiveArgumentsStart
-                )
+            $rawArguments = substr(
+                $template,
+                $directiveArgumentsStart,
+                $closingPosition - $directiveArgumentsStart
             );
+
+            // @renderSlot() is allowed to have no arguments.
+            // Other directives still reject empty argument lists.
+            if (
+                $nextDirective === '@renderSlot('
+                && trim($rawArguments) === ''
+            ) {
+                $arguments = [];
+            } else {
+                $arguments = $this->splitDirectiveArguments(
+                    $rawArguments
+                );
+            }
+
+            // Compile @components.
+            if ($nextDirective === '@components(') {
+                if (count($arguments) < 1 || count($arguments) > 2) {
+                    throw new ViewException(
+                        '@components accepts a component name and an optional props array.'
+                    );
+                }
+
+                $componentName = $this->extractStaticName(
+                    $arguments[0],
+                    '@components'
+                );
+
+                $propsExpression = '[]';
+
+                if (count($arguments) === 2) {
+                    $propsExpression = trim($arguments[1]);
+
+                    if (!$this->isSingleArrayLiteral($propsExpression)) {
+                        throw new ViewException(
+                            '@components props must be an explicit array literal.'
+                        );
+                    }
+                }
+
+                $componentStack[] = [
+                    'name' => $componentName,
+                    'activeSlot' => null,
+                    'slots' => [],
+                ];
+
+                $compiled .= '<?php $__componentContext->begin(\''
+                    . $componentName
+                    . '\', '
+                    . $propsExpression
+                    . '); ?>';
+            }
+
+            // Compile @slot.
+            elseif ($nextDirective === '@slot(') {
+                if (count($arguments) !== 1) {
+                    throw new ViewException(
+                        '@slot accepts exactly one slot name.'
+                    );
+                }
+
+                if ($componentStack === []) {
+                    throw new ViewException(
+                        '@slot must appear inside a @components block.'
+                    );
+                }
+
+                $slotName = $this->extractStaticName(
+                    $arguments[0],
+                    '@slot'
+                );
+
+                if ($slotName === 'default') {
+                    throw new ViewException(
+                        'The default slot cannot be declared with @slot.'
+                    );
+                }
+
+                $componentIndex = array_key_last($componentStack);
+
+                if ($componentStack[$componentIndex]['activeSlot'] !== null) {
+                    throw new ViewException(
+                        'Nested named slots are not supported.'
+                    );
+                }
+
+                if (array_key_exists(
+                    $slotName,
+                    $componentStack[$componentIndex]['slots']
+                )) {
+                    throw new ViewException(
+                        'Duplicate component slot: ' . $slotName
+                    );
+                }
+
+                $componentStack[$componentIndex]['activeSlot'] = $slotName;
+
+                $componentStack[$componentIndex]['slots'][$slotName] = true;
+
+                $compiled .= '<?php $__componentContext->startSlot(\''
+                    . $slotName
+                    . '\'); ?>';
+            }
+
+            // Compile @renderSlot.
+            elseif ($nextDirective === '@renderSlot(') {
+                if (count($arguments) > 1) {
+                    throw new ViewException(
+                        '@renderSlot accepts at most one slot name.'
+                    );
+                }
+
+                $slotName = 'default';
+
+                if (count($arguments) === 1) {
+                    $slotName = $this->extractStaticName(
+                        $arguments[0],
+                        '@renderSlot'
+                    );
+                }
+
+                $compiled .= '<?= $__componentContext->renderSlot(\''
+                    . $slotName
+                    . '\') ?>';
+            }
 
             // Compile @if.
             if ($nextDirective === '@if(') {
@@ -266,11 +452,9 @@ final class Compiler
                     '@include'
                 );
 
-                if (count($arguments) === 1) {
-                    $compiled .= '<?= $view->render(\''
-                        . $viewName
-                        . '\') ?>';
-                } else {
+                $dataExpression = '[]';
+
+                if (count($arguments) === 2) {
                     $dataExpression = trim($arguments[1]);
 
                     if (!$this->isSingleArrayLiteral($dataExpression)) {
@@ -278,17 +462,19 @@ final class Compiler
                             '@include data must be an explicit array literal.'
                         );
                     }
-
-                    $compiled .= '<?= $view->render(\''
-                        . $viewName
-                        . '\', '
-                        . $dataExpression
-                        . ') ?>';
                 }
+
+                $compiled .= '<?= $view->renderIncluded(\''
+                    . $viewName
+                    . '\', '
+                    . $dataExpression
+                    . ', $__componentContext) ?>';
             }
 
             // Compile @extends.
             elseif ($nextDirective === '@extends(') {
+                $compiled .= '<?php $__componentContext->assertCompositionAllowed(); ?>';
+
                 if (count($arguments) < 1 || count($arguments) > 2) {
                     throw new ViewException(
                         '@extends accepts a layout name and an optional data array.'
@@ -321,6 +507,8 @@ final class Compiler
 
             // Compile @section.
             elseif ($nextDirective === '@section(') {
+                $compiled .= '<?php $__componentContext->assertCompositionAllowed(); ?>';
+
                 if (count($arguments) !== 1) {
                     throw new ViewException(
                         '@section accepts exactly one section name.'
@@ -339,6 +527,8 @@ final class Compiler
 
             // Compile @yield.
             elseif ($nextDirective === '@yield(') {
+                $compiled .= '<?php $__componentContext->assertCompositionAllowed(); ?>';
+
                 if (count($arguments) !== 1) {
                     throw new ViewException(
                         '@yield accepts exactly one section name.'
@@ -361,6 +551,20 @@ final class Compiler
         if ($conditionalStack !== []) {
             throw new ViewException(
                 'Unclosed @if conditional block.'
+            );
+        }
+
+        if ($componentStack !== []) {
+            $componentIndex = array_key_last($componentStack);
+
+            if ($componentStack[$componentIndex]['activeSlot'] !== null) {
+                throw new ViewException(
+                    'Unclosed @slot directive.'
+                );
+            }
+
+            throw new ViewException(
+                'Unclosed @components directive.'
             );
         }
 

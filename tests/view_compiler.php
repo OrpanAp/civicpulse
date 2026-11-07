@@ -162,7 +162,7 @@ $assertThrows(
 $assert(
     $compiler->compile(
         "@include('partials/header')"
-    ) === "<?= \$view->render('partials/header') ?>",
+    ) === "<?= \$view->renderIncluded('partials/header', [], \$__componentContext) ?>",
     'Compiles an include without explicit data'
 );
 
@@ -170,7 +170,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@include('partials/header', ['siteName' => \$siteName])"
-    ) === "<?= \$view->render('partials/header', ['siteName' => \$siteName]) ?>",
+    ) === "<?= \$view->renderIncluded('partials/header', ['siteName' => \$siteName], \$__componentContext) ?>",
     'Compiles an include with explicit data'
 );
 
@@ -178,7 +178,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@include('partials/navigation', ['label' => strtoupper(trim(\$label))])"
-    ) === "<?= \$view->render('partials/navigation', ['label' => strtoupper(trim(\$label))]) ?>",
+    ) === "<?= \$view->renderIncluded('partials/navigation', ['label' => strtoupper(trim(\$label))], \$__componentContext) ?>",
     'Compiles nested expressions in include data'
 );
 
@@ -234,7 +234,7 @@ $assertThrows(
 $assert(
     $compiler->compile(
         "@extends('layouts/app')"
-    ) === "<?php \$__viewContext->extend('layouts/app', []); ?>",
+    ) === "<?php \$__componentContext->assertCompositionAllowed(); ?><?php \$__viewContext->extend('layouts/app', []); ?>",
     'Compiles a layout declaration without data'
 );
 
@@ -242,7 +242,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@extends('layouts/app', ['title' => \$title])"
-    ) === "<?php \$__viewContext->extend('layouts/app', ['title' => \$title]); ?>",
+    ) === "<?php \$__componentContext->assertCompositionAllowed(); ?><?php \$__viewContext->extend('layouts/app', ['title' => \$title]); ?>",
     'Compiles a layout declaration with explicit data'
 );
 
@@ -250,7 +250,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@section('content')"
-    ) === "<?php \$__viewContext->startSection('content'); ?>",
+    ) === "<?php \$__componentContext->assertCompositionAllowed(); ?><?php \$__viewContext->startSection('content'); ?>",
     'Compiles a section declaration'
 );
 
@@ -266,7 +266,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@yield('content')"
-    ) === "<?= \$__viewContext->yieldSection('content') ?>",
+    ) === "<?php \$__componentContext->assertCompositionAllowed(); ?><?= \$__viewContext->yieldSection('content') ?>",
     'Compiles a yield directive'
 );
 
@@ -473,6 +473,66 @@ $assertThrows(
         '@if($condition)Content'
     ),
     'Rejects an unclosed conditional block'
+);
+
+// Test 54: Reject an empty component declaration.
+$assertThrows(
+    static fn() => $compiler->compile('@components()'),
+    'Rejects an empty component declaration'
+);
+
+// Test 55: Reject more than two component arguments.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@components('card', [], [])"
+    ),
+    'Rejects extra component arguments'
+);
+
+// Test 56: Reject a dynamic component name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@components($componentName)'
+    ),
+    'Rejects a dynamic component name'
+);
+
+// Test 57: Reject non-array component props.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@components('card', \$props)"
+    ),
+    'Rejects variable component props'
+);
+
+// Test 58: Reject an empty named slot declaration.
+$assertThrows(
+    static fn() => $compiler->compile('@slot()'),
+    'Rejects an empty slot declaration'
+);
+
+// Test 59: Reject declaring the reserved default slot.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@components('card')@slot('default')@endslot@endcomponents"
+    ),
+    'Rejects declaring the default slot explicitly'
+);
+
+// Test 60: Reject multiple render-slot arguments.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@renderSlot('header', 'footer')"
+    ),
+    'Rejects multiple render-slot arguments'
+);
+
+// Test 61: Reject a dynamic render-slot name.
+$assertThrows(
+    static fn() => $compiler->compile(
+        '@renderSlot($slotName)'
+    ),
+    'Rejects a dynamic render-slot name'
 );
 
 echo "\nPassed: {$passed}\n";
