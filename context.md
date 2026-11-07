@@ -983,14 +983,15 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 
 **Planned template syntax / developer shortcuts (Laravel-inspired in ergonomics, independently designed and implemented):**
 
-- [ ] `@csrf` — render the hidden CSRF token field.
-- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
+- [ ] `@csrf` — render the hidden CSRF token field, backed by the CSRF token manager and middleware.
+- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.
+- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
 - [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
-- [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials.
-- [ ] `@components("component.php")` — proposed component-rendering syntax for reusable, parameterized UI components; define its exact naming, data/slot, escaping, and nesting contract before implementation.
-- [ ] `@call("include.php/style.css/main.js")` — proposed asset/include registration or resolution syntax; specify whether each path is a PHP partial, stylesheet, or script, how assets are emitted, ordering/deduplication, and path safety before implementation.
-- [ ] `@build("include.php")` — proposed composition/build directive for assembling a reusable include or view fragment; define how it differs from `@include` and `@components` before implementation.
-- [ ] Keep the three proposed directives distinct only if they provide genuinely different, documented behavior. If their responsibilities overlap, refine or consolidate the syntax before freezing a public API. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
+- [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials, with explicit data passing, predictable scope, nested composition, and safe path resolution.
+- [ ] `@components("component.php")` — reusable component-template invocation. A component template can be rendered repeatedly with different explicit values/props and, if supported, explicitly defined slots. Component data must not leak implicitly from the caller; nested components and escaping need a documented contract.
+- [ ] `@call("include.php/style.css/main.js")` — component/partial-scoped resource loading and registration. When declared at the top of a partial or component template, it can request approved HTML partials, CSS assets, and JavaScript assets for the current component. Define typed resource handling, where and when each asset is emitted, dependency ordering, deduplication, and component scope. The intended priority/override behavior is that an explicitly overriding resource registered for the current component can take precedence over an already registered resource; this must be a controlled registry-level override with deterministic precedence, not an unrestricted filesystem overwrite or arbitrary code execution. Finalize the exact syntax and override rules before implementation.
+- [ ] `@build(html)` — a special rendering/build directive for content whose source may be text stored in the database. Its purpose is to transform supported text-form HTML into renderable output instead of always displaying markup characters literally. This is a security-sensitive trust boundary: database content is untrusted by default. Define an allowlisted HTML subset and sanitizer/validator, preserve context-appropriate escaping, and reject or neutralize unsafe tags, attributes, URLs, embedded event handlers, and script execution. CSS and JavaScript must not become executable merely because they came from the database; any supported CSS/JS build path requires separate explicit policy, validation, and asset handling. Never implement `@build` as raw `eval()`, arbitrary PHP execution, or a blanket escaping bypass.
+- [ ] Keep `@build`, `@call`, and `@components` distinct because they represent different intended responsibilities: safe transformation/rendering of stored markup; loading/registering component resources with controlled precedence; and reusable parameterized component templates. Refine the public grammar and contracts before implementation, including malformed syntax behavior, nested use, caching, scope, and path safety. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
 - [ ] `@auth`, `@guest`, and role/permission directives only after authentication and authorization services exist.
 - [ ] `@error` and validation-error helpers after the validation and form-error contracts exist.
 - [ ] Escaped output by default, with an explicit and carefully controlled raw-output escape hatch.
@@ -1066,15 +1067,16 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 - [ ] Add accessibility, responsive behavior, CSRF protection, output escaping, secure uploads, and administrative security tests.
 - [ ] Keep the admin interface useful for CivicPulse first, while exposing stable extension points so the custom framework can reuse it in other applications.
 
-**Reusable component and asset composition in templates**
+**Reusable component, resource, and stored-markup composition in templates**
 
 - [ ] Build a first-class component/partial system with explicit inputs, optional slots/sections, predictable scope, escaping by default, and nested composition.
-- [ ] Evaluate and formally specify the requested syntax `@components("component.php")` for rendering reusable components. Define whether it accepts data/props and slots; avoid ambiguous implicit variable sharing.
-- [ ] Evaluate and formally specify `@call("include.php/style.css/main.js")` for registering or including PHP partials and front-end assets. Define typed asset handling, output locations, dependency ordering, duplicate prevention, cache behavior, and safe path resolution.
-- [ ] Evaluate and formally specify `@build("include.php")` for composing/building a view or include. Document exactly how it differs from a component render or ordinary include; consolidate directives if distinct semantics cannot be justified.
-- [ ] Support layouts, reusable components, partials, asset stacks/bundles, and page-level composition without repeated markup or duplicated script/style tags.
+- [ ] Specify and implement `@components("component.php")` as the reusable component-template mechanism. It must support rendering the same component with different explicit values/props and must define slot behavior, data isolation, nested components, and escaping.
+- [ ] Specify and implement `@call("include.php/style.css/main.js")` as component-scoped resource loading/registration. A partial/component can declare the resources it needs. Define HTML/CSS/JS resource types, approved roots, output locations, dependency ordering, deduplication, caching, and deterministic override precedence. An override raises the priority of the selected registered resource within the defined scope; it must never mean blindly overwriting arbitrary files on disk.
+- [ ] Specify and implement `@build(html)` as a special safe rendering path for supported text-form HTML, including markup stored in the database. Define an allowlist and sanitization/validation policy so safe markup can render while scripts, event-handler attributes, dangerous URLs, and other active content remain blocked unless a separate narrowly scoped and reviewed capability explicitly permits them. Database origin does not make content trusted. Do not use eval or treat this directive as a general escaping bypass. Any future CSS/JS build behavior must have its own explicit security contract.
+- [ ] Support layouts, reusable components, partials, component-scoped asset stacks/bundles, and page-level composition without repeated markup or duplicated script/style tags.
+- [ ] Keep these directives as distinct language features with documented responsibilities: `@build` transforms supported stored markup for safe rendering; `@call` loads/registers a component's resources and applies controlled priority; `@components` renders reusable templates with modified explicit values.
 - [ ] Test nested components, data isolation, escaping, malformed syntax, asset ordering, duplicate registration, cache invalidation, and traversal/unauthorized-path attempts.
-- [ ] Treat these strings as proposed template-language syntax, not PHP functions or already-implemented directives. Finalize the public API only after the template compiler and view runtime exist.
+- [ ] Treat these strings as proposed template-language syntax, not PHP functions or already-implemented directives. Finalize grammar, parsing, nesting, error handling, cache invalidation, and security contracts before implementation.
 
 **Milestone completion criteria**
 
