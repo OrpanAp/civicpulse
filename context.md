@@ -1359,62 +1359,53 @@ Implemented:
 **Next milestone:** design and implement `@call` for component-scoped resource registration. Define its typed resource grammar, approved roots, output placement, dependency ordering, deduplication, cache behavior, component scope, and deterministic override precedence before implementation. Keep `@build` separate and planned until its stored-markup security contract is finalized.
 
 
-### 5.19 `@call` resource registration — approved design and current checkpoint
+### 5.19 `@call` resource registration and asset resolution
 
-**Status: Design approved by the developer on 2026-11-07. Implementation has not started.** This section records the approved direction and the latest local inspection; it does not claim that resource registration, asset output, or asset files exist yet.
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `5be99c2` (`Add view resource registration and asset resolution`) on 2026-11-07.** The developer confirmed that local `main` and `origin/main` point to `5be99c2`, and `git status -sb` reported `## main...origin/main` with no working-tree changes.
 
-**Latest developer-reported local repository checkpoint (2026-11-07):**
+**Implemented behavior:**
 
-- [x] Local project directory: `~/Desktop/PHP OOP/Project/Power PHP Framework/civicpulse`.
-- [x] Local branch: `main`.
-- [x] Latest local source commit: `ecd1834` — `Add reusable view components with slots`.
-- [x] `git status --short` produced no output, indicating the working tree was clean at the time of inspection.
-- [x] Inspected the current View subsystem files: `View.php`, `ViewRenderer.php`, `ViewFinder.php`, `ComponentContext.php`, `ComponentRenderer.php`, and `Compiler/Compiler.php`.
-- [x] Current application view files include `resources/views/home.php`, `resources/views/layouts/app.php`, `resources/views/partials/footer.php`, and `resources/views/partials/header.php`.
-- [x] Current public files include `public/index.php` and `public/router.php`.
-- [x] Confirmed that no public CSS/JavaScript asset directories or asset registry currently exist.
-- [x] Confirmed that `View::render()` creates a fresh `ComponentContext`; included views and nested components share the active component context; page and layout rendering currently share that component context.
-- [x] Confirmed that `ViewFinder` validates static view names and confines resolved templates to the configured views directory.
-- [x] Confirmed that the compiler already parses explicit array-literal arguments for supported directives, providing a foundation for a typed `@call([...])` grammar.
+- [x] Added `ViewResourceContext` to hold stylesheet and script registrations for one render lifecycle.
+- [x] Added resource registration with validated resource types, logical keys, and non-empty paths.
+- [x] First registration wins by default. An explicit `override => true` replaces an existing resource while preserving its original registration position.
+- [x] Added `AssetResolver` to resolve CSS under `public/assets/css/` and JavaScript under `public/assets/js/`, append the expected file extension, and return a URL rather than executing or including the asset.
+- [x] Restricted logical asset paths and rejected traversal, invalid characters, missing files, unsupported resource types, and unsafe asset base URLs.
+- [x] Checked the resolved asset directory remains within the configured public directory, including protection against an asset-root symlink escaping that directory where the environment supports symlink tests.
+- [x] Added `config/assets.php` with the public filesystem path and configurable `ASSET_BASE_URL`.
+- [x] Registered `AssetResolver` as a container singleton in `bootstrap/app.php`.
+- [x] Added `@call([...])` with typed `partials`, `styles`, and `scripts` entries. Partial templates render immediately at the directive location; asset entries are registered for later output.
+- [x] Added shorthand asset paths with deterministic default logical keys and explicit descriptors supporting `key`, `path`, and optional boolean `override`.
+- [x] Added `@resources('styles')` and `@resources('scripts')` output directives. Stylesheets render as link elements and scripts render as deferred script elements.
+- [x] Restricted resource declarations to static literal arrays and strings; dynamic expressions and unsupported resource categories are rejected by the compiler.
+- [x] Threaded the same resource context through page rendering, layouts, included partials, and nested components. Independent top-level renders receive fresh resource contexts.
+- [x] Preserved the existing three-argument `renderIncluded()` API by making its resource-context argument optional; compiled includes explicitly pass the active shared context.
+- [x] Escaped generated asset URLs when producing HTML.
+- [x] Added coverage for registration order, deduplication, explicit overrides, output placement, URL escaping, path validation, context sharing, context isolation, and container integration.
 
-**Approved public API direction:**
+**Architecture decisions and security boundaries:**
 
-A component may declare its required partials, stylesheets, and scripts using one typed array:
+- Resource state belongs to a render-scoped `ViewResourceContext`; it is not stored in a global or request-independent singleton.
+- `AssetResolver` maps logical resource paths to files beneath the approved public asset roots. It does not execute asset files.
+- The asset base URL is configuration, not caller-controlled template input. Protocol-relative URLs and traversal in the base URL are rejected.
+- Resource definitions are deliberately static. The compiler accepts a constrained literal grammar rather than evaluating arbitrary expressions.
+- The first registration determines output order. An explicit override changes the resource value without moving its position.
+- `@call` handles partial rendering and CSS/JavaScript registration only. It does not sanitize stored markup or make database-originated HTML trusted.
+- `@build` remains a separate, unimplemented feature whose stored-markup allowlist and sanitization contract must be designed independently.
 
-```php
-@call([
-    'partials' => [
-        'partials/report-meta',
-    ],
-    'styles' => [
-        'components/report-card',
-    ],
-    'scripts' => [
-        'components/report-card',
-    ],
-])
-```
+**Developer-reported verification on 2026-11-07:**
 
-- [ ] `partials` are resolved through the existing View subsystem and rendered at the `@call` location.
-- [ ] `styles` register CSS assets under the approved `public/assets/css/` root.
-- [ ] `scripts` register JavaScript assets under the approved `public/assets/js/` root.
-- [ ] Layouts expose registered styles and scripts through `@resources('styles')` and `@resources('scripts')` placeholders.
-- [ ] Introduce a request/render-scoped `ViewResourceContext`, shared across the page, layout, includes, and nested components; independent renders receive fresh resource state.
-- [ ] Deduplicate repeated asset registrations so a resource requested by multiple components is emitted once.
-- [ ] Support an explicit logical key and opt-in override for deterministic replacement; ordinary duplicate registration must not silently replace an existing resource.
-- [ ] Keep asset paths static and validated, constrain resolution to their approved roots, and generate URLs through explicit application asset configuration rather than arbitrary filesystem paths.
-- [ ] Do not execute asset files on the server, accept traversal paths, or treat the registry as permission to render arbitrary PHP.
-- [ ] Preserve first-registration ordering; define and test the exact override-position behavior before implementation.
-- [ ] Keep `@build` separate and planned; `@call` does not sanitize or authorize database-originated HTML.
+- [x] `tests/asset_resolver.php` — 14 passed, 0 failed; two symlink-related checks were skipped because symlink testing was unsupported in the Windows environment.
+- [x] `tests/view_resource_context.php` — 10 passed, 0 failed.
+- [x] `tests/view_resources.php` — 20 passed, 0 failed.
+- [x] `tests/view_resource_integration.php` — 12 passed, 0 failed.
+- [x] `tests/view_compiler.php` — 76 passed, 0 failed.
+- [x] `tests/view_composition.php` — 22 passed, 0 failed.
+- [x] `tests/view_container.php` — 15 passed, 0 failed.
+- [x] The complete `for test in tests/*.php` regression loop reached its final test without stopping on a failure. Existing HTTP, CSRF, session, database, configuration, container, and View tests shown in the developer's output passed. The database factory reported environment-dependent PostgreSQL/SQLite driver skips; the MariaDB 10.4.32 connection, parameterized query, connection caching, and transaction checks passed.
+- [x] `git diff --check` and `git diff --cached --check` produced no errors before commit.
+- [x] Exactly 15 intended files were staged and committed: 8 modified files and 7 new files. Commit `5be99c2` recorded 2,399 insertions and 22 deletions.
+- [x] The developer pushed `5be99c2` successfully. Final local verification showed `main`, `origin/main`, and `origin/HEAD` at the same commit, with a clean working tree.
 
-**Implementation sequence:**
+**Definition of Done:** The typed `@call` and `@resources` directives, secure public asset resolution, render-scoped resource registration, deterministic deduplication/override behavior, and integration with pages, layouts, partials, and nested components are implemented, tested, committed, and pushed. The remaining symlink checks are explicitly environment-limited, not reported as passing.
 
-1. Inspect the local compiler parsing helpers, component renderer/context, bootstrap registrations, configuration conventions, and relevant View tests before editing.
-2. Finalize the exact literal grammar, asset extension convention, URL configuration source, and override ordering.
-3. Implement and unit-test `ViewResourceContext` independently.
-4. Thread the same context through the page/layout/include/component render lifecycle without introducing global or singleton request state.
-5. Add compiler support and focused tests for `@call`, `@resources`, malformed declarations, and path validation.
-6. Add CSS/JS resolution and output tests, including deduplication and explicit override behavior.
-7. Run the complete View and regression suites, then record developer-reported results and commit/push status separately.
-
-**Important boundary:** source-code files remain read-only to the assistant on GitHub. The developer applies all source changes locally. The assistant may update only this `context.md` file directly on GitHub, using its latest fetched blob SHA. The local branch was reported at `ecd1834`; this GitHub-only context update does not imply that the local branch has pulled the resulting documentation commit.
+**Next milestone:** Keep `@build` separate. Before implementing it, design the stored-markup trust boundary, allowed HTML elements/attributes, URL and attribute validation, sanitization strategy, and tests. Do not use `@call` or slot rendering as a substitute for that security contract.
