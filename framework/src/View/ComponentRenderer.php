@@ -26,7 +26,8 @@ final class ComponentRenderer
         array $slots,
         ComponentContext $componentContext,
         ?View $view = null,
-        ?ViewCompositionContext $viewContext = null
+        ?ViewCompositionContext $viewContext = null,
+        ?ViewResourceContext $resourceContext = null
     ): string {
         // Resolve the component before rendering.
         // Missing components retain ViewNotFoundException.
@@ -43,7 +44,8 @@ final class ComponentRenderer
                 $props,
                 $view,
                 $viewContext,
-                $componentContext
+                $componentContext,
+                $resourceContext
             );
         } finally {
             // Always restore the previous rendering frame.

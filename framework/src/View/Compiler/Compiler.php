@@ -22,6 +22,8 @@ final class Compiler
             '@components(',
             '@renderSlot(',
             '@include(',
+            '@call(',
+            '@resources(',
             '@extends(',
             '@section(',
             '@yield(',
@@ -171,13 +173,14 @@ final class Compiler
                 array_pop($componentStack);
 
                 $compiled .= <<<'PHP'
-                    <?= (static function (array $__invocation) use ($view, $__componentContext, $__viewContext): string {
+                    <?= (static function (array $__invocation) use ($view, $__componentContext, $__viewContext, $__resourceContext): string {
                         return $view->renderComponent(
                             $__invocation['name'],
                             $__invocation['props'],
                             $__invocation['slots'],
                             $__componentContext,
-                            $__viewContext
+                            $__viewContext,
+                            $__resourceContext
                         );
                     })($__componentContext->end()) ?>
                     PHP;
@@ -468,7 +471,7 @@ final class Compiler
                     . $viewName
                     . '\', '
                     . $dataExpression
-                    . ', $__componentContext) ?>';
+                    . ', $__componentContext, $__resourceContext) ?>';
             }
 
             // Compile @extends.
@@ -543,6 +546,51 @@ final class Compiler
                 $compiled .= '<?= $__viewContext->yieldSection(\''
                     . $sectionName
                     . '\') ?>';
+            }
+
+            // Compile @call.
+            elseif ($nextDirective === '@call(') {
+                if (count($arguments) !== 1) {
+                    throw new ViewException(
+                        '@call accepts exactly one resource definition array.'
+                    );
+                }
+
+                $definitionExpression = trim($arguments[0]);
+
+                if (!$this->isStaticResourceDefinition($definitionExpression)) {
+                    throw new ViewException(
+                        '@call requires an explicit array literal.'
+                    );
+                }
+
+                $compiled .= '<?= $view->call('
+                    . $definitionExpression
+                    . ', $__componentContext, $__resourceContext) ?>';
+            }
+
+            // Compile @resources.
+            elseif ($nextDirective === '@resources(') {
+                if (count($arguments) !== 1) {
+                    throw new ViewException(
+                        '@resources accepts exactly one resource type.'
+                    );
+                }
+
+                $resourceType = $this->extractStaticName(
+                    $arguments[0],
+                    '@resources'
+                );
+
+                if (!in_array($resourceType, ['styles', 'scripts'], true)) {
+                    throw new ViewException(
+                        '@resources supports only styles and scripts.'
+                    );
+                }
+
+                $compiled .= '<?= $view->resources(\''
+                    . $resourceType
+                    . '\', $__resourceContext) ?>';
             }
 
             $position = $closingPosition + 1;
@@ -843,6 +891,72 @@ final class Compiler
         }
 
         return $arguments;
+    }
+
+    /**
+     * Ensures a resource definition contains only static values.
+     *
+     * Allowed:
+     * - Short arrays
+     * - Quoted strings
+     * - Array arrows
+     * - Commas
+     * - Boolean true and false
+     *
+     * Dynamic PHP expressions are rejected.
+     */
+    private function isStaticResourceDefinition(
+        string $expression
+    ): bool {
+        if (!$this->isSingleArrayLiteral($expression)) {
+            return false;
+        }
+
+        try {
+            $tokens = token_get_all(
+                '<?php ' . $expression . ';',
+                TOKEN_PARSE
+            );
+        } catch (\ParseError) {
+            return false;
+        }
+
+        $allowedTokens = [
+            T_OPEN_TAG,
+            T_WHITESPACE,
+            T_CONSTANT_ENCAPSED_STRING,
+            T_DOUBLE_ARROW,
+            T_STRING,
+        ];
+
+        foreach ($tokens as $token) {
+            if (is_array($token)) {
+                [$tokenType, $tokenValue] = $token;
+
+                if (!in_array($tokenType, $allowedTokens, true)) {
+                    return false;
+                }
+
+                if (
+                    $tokenType === T_STRING
+                    && !in_array(
+                        strtolower($tokenValue),
+                        ['true', 'false'],
+                        true
+                    )
+                ) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!in_array($token, ['[', ']', ',', ';'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

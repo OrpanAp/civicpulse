@@ -11,6 +11,7 @@ use CivicPulse\Framework\View\HtmlEscaper;
 use CivicPulse\Framework\View\View;
 use CivicPulse\Framework\View\ViewFinder;
 use CivicPulse\Framework\View\ViewRenderer;
+use CivicPulse\Framework\View\AssetResolver;
 
 echo "Testing View service container integration..." . PHP_EOL;
 
@@ -109,6 +110,19 @@ viewContainerCheck(
 viewContainerCheck(
     $container->make(HtmlEscaper::class) === $escaper,
     'HtmlEscaper is registered as a singleton'
+);
+
+// Resolve the asset resolver.
+$assetResolver = $container->make(AssetResolver::class);
+
+viewContainerCheck(
+    $assetResolver instanceof AssetResolver,
+    'AssetResolver resolves from the container'
+);
+
+viewContainerCheck(
+    $container->make(AssetResolver::class) === $assetResolver,
+    'AssetResolver is registered as a singleton'
 );
 
 echo PHP_EOL;

@@ -21,13 +21,16 @@ class ViewRenderer
         array $data = [],
         ?View $view = null,
         ?ViewCompositionContext $viewContext = null,
-        ?ComponentContext $componentContext = null
+        ?ComponentContext $componentContext = null,
+        ?ViewResourceContext $resourceContext = null
     ): string {
         $compiledPath = $this->compiledViewCache->compile($path);
 
         $viewContext ??= new ViewCompositionContext();
 
         $componentContext ??= new ComponentContext();
+
+        $resourceContext ??= new ViewResourceContext();
 
         $initialBufferLevel = ob_get_level();
 
@@ -47,7 +50,8 @@ class ViewRenderer
                 HtmlEscaper $__escaper,
                 ?View $view,
                 ViewCompositionContext $__viewContext,
-                ComponentContext $__componentContext
+                ComponentContext $__componentContext,
+                ViewResourceContext $__resourceContext
             ): void {
                 extract(
                     $__viewData,
@@ -62,7 +66,8 @@ class ViewRenderer
                 $this->escaper,
                 $view,
                 $viewContext,
-                $componentContext
+                $componentContext,
+                $resourceContext
             );
 
             $rendererBufferLevel = $initialBufferLevel + 1;

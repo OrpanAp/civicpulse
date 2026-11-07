@@ -20,6 +20,7 @@ use CivicPulse\Framework\View\View;
 use CivicPulse\Framework\View\ViewFinder;
 use CivicPulse\Framework\View\ViewRenderer;
 use CivicPulse\Framework\View\ComponentRenderer;
+use CivicPulse\Framework\View\AssetResolver;
 
 $basePath = dirname(__DIR__);
 
@@ -73,6 +74,19 @@ $container->singleton(ConnectionFactory::class);
 $container->singleton(DatabaseManager::class);
 
 // 6. Register the View system.
+
+// Resolve and validate public CSS and JavaScript assets.
+$container->singleton(
+    AssetResolver::class,
+    static function (Container $container): AssetResolver {
+        $config = $container->make(ConfigRepository::class);
+
+        return new AssetResolver(
+            $config->get('assets.public_path'),
+            $config->get('assets.base_url', '')
+        );
+    }
+);
 
 // The template compiler.
 $container->singleton(Compiler::class);

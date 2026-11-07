@@ -27,6 +27,7 @@ $directories = [
     $viewsPath . DIRECTORY_SEPARATOR . 'layouts',
     $viewsPath . DIRECTORY_SEPARATOR . 'pages',
     $viewsPath . DIRECTORY_SEPARATOR . 'partials',
+    $viewsPath . DIRECTORY_SEPARATOR . 'components',
     $basePath . DIRECTORY_SEPARATOR . 'outside',
 ];
 
@@ -268,6 +269,105 @@ try {
         <<<'VIEW'
         @extends('layouts/composed')
         @extends('layouts/isolation')
+        VIEW
+    );
+
+    // Layout that displays registered stylesheet resources.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'layouts'
+            . DIRECTORY_SEPARATOR . 'resource-check.php',
+        <<<'VIEW'
+        <?php foreach ($__resourceContext->getResources('styles') as $resource): ?>
+            <?= $resource['key'] ?>:<?= $resource['path'] ?>;
+        <?php endforeach; ?>
+        VIEW
+    );
+
+    // Partial that registers a stylesheet.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'partials'
+            . DIRECTORY_SEPARATOR . 'resource-registration.php',
+        <<<'VIEW'
+        <?php
+        $__resourceContext->register(
+            'styles',
+            'partial-style',
+            'partials/header'
+        );
+        ?>
+        PARTIAL
+        VIEW
+    );
+
+    // Component that registers a stylesheet and renders a nested component.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'components'
+            . DIRECTORY_SEPARATOR . 'resource-outer.php',
+        <<<'VIEW'
+        <?php
+        $__resourceContext->register(
+            'styles',
+            'outer-component-style',
+            'components/outer'
+        );
+        ?>
+        @components('resource-inner')
+        @endcomponents
+        VIEW
+    );
+
+    // Nested component that registers its own stylesheet.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'components'
+            . DIRECTORY_SEPARATOR . 'resource-inner.php',
+        <<<'VIEW'
+        <?php
+        $__resourceContext->register(
+            'styles',
+            'inner-component-style',
+            'components/inner'
+        );
+        ?>
+        INNER COMPONENT
+        VIEW
+    );
+
+    // Page registering a resource and using a partial and nested components.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'pages'
+            . DIRECTORY_SEPARATOR . 'resource-sharing.php',
+        <<<'VIEW'
+        <?php
+        $__resourceContext->register(
+            'styles',
+            'page-style',
+            'pages/home'
+        );
+        ?>
+
+        PAGE
+
+        @include('partials/resource-registration')
+
+        @components('resource-outer')
+        @endcomponents
+        VIEW
+    );
+
+    // Template used to verify independent renders receive fresh contexts.
+    file_put_contents(
+        $viewsPath . DIRECTORY_SEPARATOR . 'pages'
+            . DIRECTORY_SEPARATOR . 'resource-isolation.php',
+        <<<'VIEW'
+        <?php
+        $__resourceContext->register(
+            'styles',
+            'same-key',
+            $resourcePath
+        );
+
+        echo $__resourceContext->getResources('styles')[0]['path'];
+        ?>
         VIEW
     );
 
@@ -545,6 +645,37 @@ try {
             && str_contains($secondOutput, 'Second Heading')
             && !str_contains($secondOutput, 'First Heading'),
         'Keeps composition state isolated between renders'
+    );
+
+    // Test 21: Page, partials, and nested components share resources with layout.
+    $output = $view->renderWithLayout(
+        'pages/resource-sharing',
+        'layouts/resource-check'
+    );
+
+    $assert(
+        str_contains($output, 'page-style:pages/home;')
+            && str_contains($output, 'partial-style:partials/header;')
+            && str_contains($output, 'outer-component-style:components/outer;')
+            && str_contains($output, 'inner-component-style:components/inner;'),
+        'Shares resource context across pages, partials, nested components, and layouts'
+    );
+
+    // Test 22: Independent renders receive fresh resource contexts.
+    $firstResourceOutput = $view->render(
+        'pages/resource-isolation',
+        ['resourcePath' => 'first/path']
+    );
+
+    $secondResourceOutput = $view->render(
+        'pages/resource-isolation',
+        ['resourcePath' => 'second/path']
+    );
+
+    $assert(
+        trim($firstResourceOutput) === 'first/path'
+            && trim($secondResourceOutput) === 'second/path',
+        'Keeps resource context isolated between independent renders'
     );
 } finally {
     // Remove compiled cache files.

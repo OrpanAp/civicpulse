@@ -162,7 +162,7 @@ $assertThrows(
 $assert(
     $compiler->compile(
         "@include('partials/header')"
-    ) === "<?= \$view->renderIncluded('partials/header', [], \$__componentContext) ?>",
+    ) === "<?= \$view->renderIncluded('partials/header', [], \$__componentContext, \$__resourceContext) ?>",
     'Compiles an include without explicit data'
 );
 
@@ -170,7 +170,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@include('partials/header', ['siteName' => \$siteName])"
-    ) === "<?= \$view->renderIncluded('partials/header', ['siteName' => \$siteName], \$__componentContext) ?>",
+    ) === "<?= \$view->renderIncluded('partials/header', ['siteName' => \$siteName], \$__componentContext, \$__resourceContext) ?>",
     'Compiles an include with explicit data'
 );
 
@@ -178,7 +178,7 @@ $assert(
 $assert(
     $compiler->compile(
         "@include('partials/navigation', ['label' => strtoupper(trim(\$label))])"
-    ) === "<?= \$view->renderIncluded('partials/navigation', ['label' => strtoupper(trim(\$label))], \$__componentContext) ?>",
+    ) === "<?= \$view->renderIncluded('partials/navigation', ['label' => strtoupper(trim(\$label))], \$__componentContext, \$__resourceContext) ?>",
     'Compiles nested expressions in include data'
 );
 
@@ -533,6 +533,111 @@ $assertThrows(
         '@renderSlot($slotName)'
     ),
     'Rejects a dynamic render-slot name'
+);
+
+// Test: Compile @call with resource definitions.
+$assert(
+    $compiler->compile(
+        "@call(['styles' => ['components/report-card']])"
+    ) === "<?= \$view->call(['styles' => ['components/report-card']], \$__componentContext, \$__resourceContext) ?>",
+    'Compiles a resource registration directive'
+);
+
+// Test: Compile @call with an empty definition.
+$assert(
+    $compiler->compile('@call([])')
+        === "<?= \$view->call([], \$__componentContext, \$__resourceContext) ?>",
+    'Compiles an empty resource registration directive'
+);
+
+// Test: Reject variable resource definitions.
+$assertThrows(
+    static fn() => $compiler->compile('@call($resources)'),
+    'Rejects variable resource definitions'
+);
+
+// Test: Reject dynamic resource paths.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@call(['styles' => [\$dynamicPath]])"
+    ),
+    'Rejects dynamic resource paths'
+);
+
+// Test: Reject function calls in resource definitions.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@call(['styles' => [getAssetPath()]])"
+    ),
+    'Rejects function calls in resource definitions'
+);
+
+// Test: Reject string concatenation.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@call(['styles' => ['components/' . 'card']])"
+    ),
+    'Rejects expressions in resource paths'
+);
+
+// Test: Reject dynamic descriptor values.
+$assertThrows(
+    static fn() => $compiler->compile(
+        "@call(['styles' => [['key' => 'card', 'path' => \$path]]])"
+    ),
+    'Rejects dynamic asset descriptor paths'
+);
+
+// Test: Accept boolean override values.
+$assert(
+    $compiler->compile(
+        "@call(['styles' => [['key' => 'card', 'path' => 'components/card', 'override' => true]]])"
+    ) !== '',
+    'Accepts static boolean override values'
+);
+
+// Test: Reject extra @call arguments.
+$assertThrows(
+    static fn() => $compiler->compile("@call([], [])"),
+    'Rejects extra resource registration arguments'
+);
+
+// Test: Reject an unclosed @call directive.
+$assertThrows(
+    static fn() => $compiler->compile("@call(['styles' => []]"),
+    'Rejects an unclosed resource registration directive'
+);
+
+// Test: Compile stylesheet output.
+$assert(
+    $compiler->compile("@resources('styles')")
+        === "<?= \$view->resources('styles', \$__resourceContext) ?>",
+    'Compiles stylesheet resource output'
+);
+
+// Test: Compile JavaScript output.
+$assert(
+    $compiler->compile("@resources('scripts')")
+        === "<?= \$view->resources('scripts', \$__resourceContext) ?>",
+    'Compiles JavaScript resource output'
+);
+
+// Test: Reject unsupported resource output types.
+$assertThrows(
+    static fn() => $compiler->compile("@resources('images')"),
+    'Rejects unsupported resource output types'
+);
+
+// Test: Reject dynamic resource output types.
+$assertThrows(
+    static fn() => $compiler->compile('@resources($type)'),
+    'Rejects dynamic resource output types'
+);
+
+// Test: Reject extra resource output arguments.
+$assertThrows(
+    static fn() => $compiler->compile("@resources('styles', 'extra')"),
+    'Rejects extra resource output arguments'
 );
 
 echo "\nPassed: {$passed}\n";
