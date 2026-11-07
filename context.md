@@ -994,7 +994,7 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 - [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
 - [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
 - [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials, with explicit data passing, predictable scope, nested composition, and safe path resolution.
-- [ ] `@components("component.php")` — reusable component-template invocation. A component template can be rendered repeatedly with different explicit values/props and, if supported, explicitly defined slots. Component data must not leak implicitly from the caller; nested components and escaping need a documented contract.
+- [x] `@components('name', [...])` — implemented reusable component-template invocation with a static quoted component name, optional explicit props array, default and named slots, nested components, isolated props, and escaped interpolation. See section 5.18 for the verified contract.
 - [ ] `@call("include.php/style.css/main.js")` — component/partial-scoped resource loading and registration. When declared at the top of a partial or component template, it can request approved HTML partials, CSS assets, and JavaScript assets for the current component. Define typed resource handling, where and when each asset is emitted, dependency ordering, deduplication, and component scope. The intended priority/override behavior is that an explicitly overriding resource registered for the current component can take precedence over an already registered resource; this must be a controlled registry-level override with deterministic precedence, not an unrestricted filesystem overwrite or arbitrary code execution. Finalize the exact syntax and override rules before implementation.
 - [ ] `@build(html)` — a special rendering/build directive for content whose source may be text stored in the database. Its purpose is to transform supported text-form HTML into renderable output instead of always displaying markup characters literally. This is a security-sensitive trust boundary: database content is untrusted by default. Define an allowlisted HTML subset and sanitizer/validator, preserve context-appropriate escaping, and reject or neutralize unsafe tags, attributes, URLs, embedded event handlers, and script execution. CSS and JavaScript must not become executable merely because they came from the database; any supported CSS/JS build path requires separate explicit policy, validation, and asset handling. Never implement `@build` as raw `eval()`, arbitrary PHP execution, or a blanket escaping bypass.
 - [ ] Keep `@build`, `@call`, and `@components` distinct because they represent different intended responsibilities: safe transformation/rendering of stored markup; loading/registering component resources with controlled precedence; and reusable parameterized component templates. Refine the public grammar and contracts before implementation, including malformed syntax behavior, nested use, caching, scope, and path safety. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
@@ -1075,8 +1075,8 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 
 **Reusable component, resource, and stored-markup composition in templates**
 
-- [ ] Build a first-class component/partial system with explicit inputs, optional slots/sections, predictable scope, escaping by default, and nested composition.
-- [ ] Specify and implement `@components("component.php")` as the reusable component-template mechanism. It must support rendering the same component with different explicit values/props and must define slot behavior, data isolation, nested components, and escaping.
+- [x] Build a first-class component/partial system with explicit inputs, optional named slots, predictable scope, escaping by default, and nested composition. See section 5.18.
+- [x] Specify and implement `@components('name', [...])` as the reusable component-template mechanism. It supports explicit props, default and named slots, data isolation, nested components, and escaped interpolation. See section 5.18.
 - [ ] Specify and implement `@call("include.php/style.css/main.js")` as component-scoped resource loading/registration. A partial/component can declare the resources it needs. Define HTML/CSS/JS resource types, approved roots, output locations, dependency ordering, deduplication, caching, and deterministic override precedence. An override raises the priority of the selected registered resource within the defined scope; it must never mean blindly overwriting arbitrary files on disk.
 - [ ] Specify and implement `@build(html)` as a special safe rendering path for supported text-form HTML, including markup stored in the database. Define an allowlist and sanitization/validation policy so safe markup can render while scripts, event-handler attributes, dangerous URLs, and other active content remain blocked unless a separate narrowly scoped and reviewed capability explicitly permits them. Database origin does not make content trusted. Do not use eval or treat this directive as a general escaping bypass. Any future CSS/JS build behavior must have its own explicit security contract.
 - [ ] Support layouts, reusable components, partials, component-scoped asset stacks/bundles, and page-level composition without repeated markup or duplicated script/style tags.
@@ -1165,7 +1165,7 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Continue from the locally implemented View composition and conditional-directive milestone in section 5.17. Inspect the current local compiler, renderer, and composition context before extending the language. The next design work is the distinct contracts for parameterized `@components`, component-scoped resource registration through `@call`, and safe stored-markup rendering through `@build`; do not conflate these features or treat the roadmap syntax as implemented. CivicPulse report persistence, authentication, and authorization remain unimplemented. Continue to distinguish local verification from committed/pushed repository state; source changes remain user-managed locally.
+**Current next action:** Continue from the committed View composition, conditional-directive, and reusable component milestone in sections 5.17–5.18. The next View Engine feature to design is `@call` for controlled, component-scoped resource registration. Before implementation, inspect the current compiler, renderer, component context, and view/resource directory conventions; define resource types, approved roots, output locations, dependency ordering, deduplication, caching, scope, and deterministic override precedence. Keep `@build` separate and defer it until its stored-markup allowlist and sanitization contract is designed. CivicPulse report persistence, authentication, and authorization remain unimplemented. Source-code changes remain user-managed locally; only `context.md` is updated directly on GitHub.
 
 ### 5.14 Session abstraction, configuration, and request lifecycle
 
@@ -1278,15 +1278,15 @@ Implemented locally:
 - Pass the shared View service explicitly to route registration. Avoid global service state or a service locator.
 - The compiled view cache is outside the public document root.
 - The compiler supports its documented interpolation syntax only; it is not a full PHP parser and does not support every possible PHP lexical construct.
-- The first `resources/views/home.php` template was initially a standalone page. Shared layout/section composition and partial inclusion were implemented in the subsequent local milestone recorded in section 5.17. A separate parameterized component system and component-scoped asset composition remain planned.
+- The first `resources/views/home.php` template was initially a standalone page. Shared layout/section composition and partial inclusion were implemented in section 5.17. The parameterized component system was implemented in section 5.18; component-scoped asset composition remains planned.
 - Report persistence, authentication, authorization, and the CivicPulse administrative dashboard remain future work.
 - These are local developer-reported results. Do not claim a source commit, push, clean working tree, or synchronization without subsequent verification.
 
-**Next milestone:** continue the template-language roadmap from the implemented composition and conditional foundation. Inspect the current compiler, renderer, and composition context before designing the still-planned parameterized `@components`, resource-registration `@call`, and safe stored-markup `@build` directives. Keep their responsibilities distinct and define parsing, scope, caching, and security contracts before implementation.
+**Next milestone:** design and implement `@call` for component-scoped resource registration. Inspect the current compiler, renderer, component context, and view/resource directory conventions first. Finalize typed resource declarations, approved roots, output placement, dependency ordering, deduplication, caching, component scope, and deterministic override precedence before coding. Keep `@build` separate and planned until its stored-markup sanitization contract is designed.
 
 ### 5.17 Template composition and conditional directives
 
-**Status: Implemented and locally verified by the developer on 2026-11-07. These View/compiler changes remain local; no source commit or push has been reported.**
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `ecd1834` on 2026-11-07. The same commit also contains the reusable component implementation in section 5.18.**
 
 Implemented locally:
 
@@ -1314,7 +1314,46 @@ Implemented locally:
 - Application templates use the supported directives such as `@extends`, `@section`, `@yield`, and `@include`. Do not use raw PHP calls such as `<?= $view->render(...) ?>` to compose application templates.
 - The compiler translates supported template syntax into PHP. Generated PHP is an internal compilation output, not a reason to expose arbitrary PHP execution or bypass template escaping.
 - The compiler's expression scanner is deliberately not described as a complete PHP parser. Continue to test nested delimiters, quoted strings, malformed expressions, and directive nesting.
-- The roadmap directives `@components`, `@call`, and `@build` remain planned, not implemented. Their responsibilities remain separate: reusable parameterized templates, controlled component resource registration, and safe rendering of supported stored markup, respectively.
-- These are local developer-reported results. Do not claim that the View source changes are committed, pushed, or synchronized with GitHub.
+- `@components` is implemented and pushed in commit `ecd1834`; see section 5.18. `@call` and `@build` remain planned and distinct: controlled component-resource registration, and safe rendering of supported stored markup, respectively.
+- These test results were reported from local runs. The source changes were subsequently committed and pushed in `ecd1834`; the component milestone's final regression results are recorded in section 5.18.
 
 **Definition of Done:** layout/section composition, partial inclusion, nested conditionals, conditional syntax validation, and escaped interpolation within branches were implemented locally. The latest reported results are 97 passing tests across the four View integration, renderer, compiler, and composition suites, with the verification timing caveat recorded above.
+
+### 5.18 Reusable view components with props and slots
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `ecd1834` (`Add reusable view components with slots`) on 2026-11-07.**
+
+Implemented:
+
+- [x] Added `ComponentContext` to manage component invocation buffers, default-slot capture, named-slot capture, and component rendering frames independently from layout/section composition state.
+- [x] Added `ComponentRenderer` to resolve component templates under `resources/views/components/`, render them with explicitly supplied props and slots, and restore rendering state even when rendering fails.
+- [x] Added `@components('name')` and `@components('name', [...])` with a static quoted component name and optional explicit array-literal props.
+- [x] Component templates receive only their explicit props; caller variables are not implicitly inherited.
+- [x] Added the default slot and named slots through `@slot('name')` / `@endslot`, with `@renderSlot()` and `@renderSlot('name')` in component templates.
+- [x] Supported nested components, components inside included partials, and shared component invocation context across included partials while preserving explicit include-data isolation.
+- [x] Rejected duplicate named slots, invalid or unclosed component/slot declarations, dynamic component/slot names, and layout-composition directives inside component templates.
+- [x] Missing slots render as empty strings; missing component templates preserve `ViewNotFoundException`.
+- [x] Kept slot content as template-authored markup; escaped interpolations inside slots remain escaped. Slot rendering is not a general-purpose raw-output or database-HTML escaping bypass.
+- [x] Registered `ComponentRenderer` through the application container and integrated component context with `View`, `ViewRenderer`, and the compiler.
+
+**Developer-reported verification on 2026-11-07:**
+
+- [x] PHP syntax checks passed for `ComponentContext.php`, `ComponentRenderer.php`, `View.php`, `ViewRenderer.php`, and `Compiler.php`.
+- [x] `php tests/view.php` — 13 passed, 0 failed.
+- [x] `php tests/view_renderer.php` — 11 passed, 0 failed.
+- [x] `php tests/view_compiler.php` — 61 passed, 0 failed.
+- [x] `php tests/view_composition.php` — 20 passed, 0 failed.
+- [x] `php tests/view_components.php` — 27 passed, 0 failed.
+- [x] The selected non-database regression test loop completed successfully; the developer separately reported successful `database_factory.php`, `setup_test_database.php`, and `database_connection.php` runs against MariaDB 10.4.32.
+- [x] The eight intended source/test files passed `git diff --cached --check`, were committed as `ecd1834`, and were pushed to `origin/main`. The developer's `git status --short` was empty before the push.
+
+**Architecture decisions and remaining limitations:**
+
+- Component templates live under the approved `resources/views/components/` directory and use explicit props rather than inheriting the caller's variable scope.
+- Invocation frames capture caller-provided slot content; rendering frames expose those slots only to the component currently being rendered. This keeps nested invocation state separate from the slots available to the active component template.
+- Included partials share the active component context so a component invocation can span supported template composition, while each include still receives its explicit data array and fresh layout-composition context.
+- Component templates cannot declare layout inheritance or sections. Layouts and sections remain page-level composition features.
+- Slot markup originates in trusted application templates. Dynamic interpolations retain normal HTML escaping. Database-originated HTML remains untrusted and must be handled by the future `@build` allowlist/sanitization design.
+- `@call` and `@build` are not implemented. Do not treat component rendering as asset registration or as safe rendering of arbitrary stored markup.
+
+**Next milestone:** design and implement `@call` for component-scoped resource registration. Define its typed resource grammar, approved roots, output placement, dependency ordering, deduplication, cache behavior, component scope, and deterministic override precedence before implementation. Keep `@build` separate and planned until its stored-markup security contract is finalized.
