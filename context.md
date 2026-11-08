@@ -1513,3 +1513,79 @@ The current `main` branch was inspected after the developer confirmed that `SECU
 5. Produce a prioritized findings list with evidence, severity, remediation, and regression tests before adding new security features.
 6. Update this section and `SECURITY.md` only when the next findings are supported by inspected source and test output.
 
+
+
+### 5.22 Framework-wide security architecture, compatibility, and scalability requirements
+
+**Status: Adopted as an architectural requirement and roadmap; implementation and verification are pending. (2026-11-08)**
+
+The developer supplied `SECURITY-REQUIREMENTS-README.md` as the security baseline for CivicPulse and the planned reusable Power PHP Framework. Its four maturity levels (Basic, Standard, Advanced, Professional), beginner glossary, OWASP/MITRE/NIST/SSDF/SLSA/CISA references, framework-specific requirements, and testing expectations are the planning basis for this milestone. The checklist is a requirements source, not proof that CivicPulse or the framework currently meets any standard or certification.
+
+**Core objective**
+
+Build professional, defense-in-depth security capabilities into the framework itself so that applications receive secure defaults and reusable protection mechanisms instead of each application independently reinventing them. These capabilities must be designed for backward compatibility, incremental adoption, and scalable deployment. The safe path should be the easiest path, and security must not be an optional paid-style add-on.
+
+**Non-negotiable architecture principles**
+
+1. **Secure by default and fail closed:** new applications should start with safe configuration. Missing, invalid, or failed security decisions must not silently grant access. Production boot should validate security-sensitive configuration and reject known-dangerous defaults where safe enforcement is possible.
+2. **Defense in depth:** use independent layers at request boundaries, routing, validation, authorization, persistence, output rendering, file handling, runtime configuration, logging, and deployment. No single header, middleware, scanner, or library is treated as complete security.
+3. **Backward compatibility:** preserve existing public APIs, constructor argument order, method signatures, route behavior, and established application behavior wherever this can be done without retaining a known exploitable vulnerability. Add optional dependencies/parameters compatibly, provide adapters for old extension points, and avoid unnecessary breaking changes.
+4. **Explicit migration for unsafe legacy behavior:** when a secure default changes behavior, document the impact, provide a migration path and actionable diagnostics, and use deprecation periods where continued operation is not itself a serious security risk. A known critical vulnerability must not be kept enabled merely for compatibility; provide a secure replacement and clearly document the necessary migration.
+5. **Modular and extensible:** security services should have small interfaces/contracts, dependency-injection bindings, configurable policies, and replaceable storage/backends. Applications may extend or replace a provider without forking framework internals. Do not create one monolithic security manager.
+6. **Scalable and concurrency-safe:** avoid request-specific mutable state in long-lived singletons or static globals. Keep request/render state scoped to the request or operation. Design session, rate-limit, cache, queue, audit-log, and key-storage integrations so they can use shared/distributed backends for multiple workers and application instances.
+7. **Performance-aware without weakening controls:** use bounded input, predictable algorithms, caching only where safe, and measurable overhead. Any cache of security decisions must have explicit invalidation/expiry semantics and must not allow stale permissions or revoked credentials to remain valid.
+8. **Testable and transparent:** each control needs positive and negative tests, failure-path tests, documented configuration, operational limitations, and evidence. Distinguish implemented, tested, externally verified, and not-yet-implemented controls in `SECURITY.md` and this context.
+
+**Framework security capability targets (planned; not claims of current implementation)**
+
+- **Request and input boundary:** central validation contracts; request/body/JSON depth and upload-size limits; safe header parsing; trusted-proxy-only client IP and scheme resolution; safe host/URL handling; strict redirect validation; SSRF-safe outbound HTTP client option.
+- **Output and injection resistance:** context-aware escaping by default; explicit and conspicuous safe-HTML opt-in; parameterized database operations as the normal path; safe identifier handling; command execution avoided or tightly constrained; mass-assignment protection and explicit field allowlists.
+- **Identity and sessions:** vetted password hashing helper (prefer Argon2id where supported, with documented secure fallback); generic authentication responses; throttling hooks; session ID regeneration after authentication and privilege changes; idle and absolute expiration; server-side logout invalidation; secure cookie defaults; MFA/passkey extension points; safe account recovery primitives. Authentication features must not be presented as complete until their complete lifecycle is implemented and tested.
+- **Authorization:** centralized policies/gates and route middleware; deny-by-default support; object ownership and property-level checks; role/permission contracts; tests for unauthenticated, forbidden, cross-user/object, revoked, and disabled-account cases. The framework provides enforcement mechanisms; each application must still define its own business permissions.
+- **Browser protections:** CSRF protection on all unsafe methods with constant-time token validation and documented token lifecycle; Origin/Referer defense in depth where appropriate; configurable CSP (report-only rollout and enforce mode); HSTS only when HTTPS deployment is confirmed; framing, MIME-sniffing, referrer, and permissions policies; strict CORS allowlists.
+- **Abuse and resource controls:** pluggable rate limiting and quotas for IP, identity, token, and route; distributed atomic limiter backends; request and pagination limits; timeouts and bounded retries; protections against resource exhaustion and sensitive business-flow abuse.
+- **Data, files, and cryptography:** secure upload validation by content, size and allowlisted type; generated storage names; storage outside public root by default; safe download disposition; least-privilege database contracts; encryption/signing through vetted high-level libraries; key rotation/provider interfaces; no custom cryptographic algorithms.
+- **Errors, audit, and operations:** generic production errors with detailed internal diagnostics; structured request-correlated logs; security-event hooks and audit trails; automatic redaction of secrets, tokens and sensitive fields; monitoring/alert integration points; backups and restore guidance; environment/config validation and secret separation.
+- **Supply chain and release assurance:** minimal reviewed dependencies and committed lockfiles; dependency and secret scanning in CI; static/dynamic security testing; SBOM and artifact provenance/signing as the release process matures; vulnerability disclosure and advisory process; documented patch and upgrade policy.
+- **AI integration boundary (if/when included):** treat model output and retrieved content as untrusted; apply least privilege to tools/agents; keep secrets out of prompts; bound tokens, cost, and execution; require approval for consequential actions.
+
+**Backward-compatibility policy**
+
+- Record the existing public API and behavior before each security change; add regression tests for current supported behavior.
+- Prefer additive interfaces, optional constructor arguments at the end, default interface adapters, and new middleware/providers over invasive rewrites.
+- Keep legacy behavior only when it is not a security bypass. If unsafe behavior must be removed, document the threat, affected APIs/configuration, migration steps, and release impact.
+- Introduce deprecations with clear warnings and a target removal release when practical; never silently downgrade a secure setting to preserve compatibility.
+- Provide an explicit compatibility/migration guide and tests that exercise both supported legacy integration paths and the new secure path.
+- Use semantic versioning consistently. Security fixes may require urgent patch releases; do not label a behavior-breaking security fix as non-breaking without evidence.
+- Do not make all controls globally mandatory in one change. Introduce them in staged, independently testable milestones, while ensuring new applications receive the safest defaults available.
+
+**Scalability and deployment policy**
+
+- Keep framework core independent of a particular cache, database, session store, queue, monitoring vendor, or cloud platform.
+- Define backend contracts for distributed sessions, rate limiting, cache, locks, audit/event delivery, and secrets/key providers; retain lightweight local adapters for development and small deployments.
+- Require atomic operations and clear consistency/expiry guarantees for distributed security-sensitive state, especially throttling, token revocation, session invalidation, and permission changes.
+- Ensure request and render state is isolated between concurrent requests and safe under persistent workers; document worker lifecycle requirements.
+- Support horizontal scaling through shared backends rather than process-local assumptions. Document single-node limitations when a shared backend is not configured.
+- Add load/concurrency tests and measure latency/memory overhead before calling a feature scalable. Do not trade away authorization, token validation, or rate-limit correctness for throughput.
+
+**Implementation and audit sequence**
+
+1. Finish the current evidence-based audit of sessions, trusted proxies, request parsing, middleware failure paths, database access, logging, View sanitization, and asset resolution. Record findings with severity, evidence, remediation, and regression tests.
+2. Complete the Basic baseline first: validation, output encoding, parameterized persistence, session lifecycle, HTTPS/deployment guidance, authorization enforcement hooks, safe errors, secrets/configuration, dependency hygiene, uploads, security headers, logging, and tested backups.
+3. Build the Standard layer: centralized authorization, authentication lifecycle, CSRF/browser policy hardening, distributed rate limiting, API schemas/limits, data protection, security-event monitoring, and CI scanning.
+4. Add Advanced capabilities where application threat models require them: tenant isolation, phishing-resistant MFA/passkeys, service identity, managed secrets/keys, runtime controls, fuzzing, and independent assurance.
+5. Establish Professional maintainer practices: SSDF-aligned secure development, signed/provenanced releases, SBOM, vulnerability disclosure/advisories, patch SLAs, incident response, and measured recovery.
+6. For each milestone, update `SECURITY.md` with only source-confirmed status and update this context with implementation decisions, compatibility impact, tests, and remaining gaps.
+
+**Definition of done for each security capability**
+
+- Threat and trust boundary are documented.
+- Secure default and failure behavior are specified.
+- Public API and backward-compatibility impact are reviewed.
+- Configuration is validated and documented.
+- Unit, integration, negative, regression, and relevant concurrency/failure tests pass.
+- Extension and distributed-backend contracts are documented where applicable.
+- Performance and operational constraints are measured or explicitly listed as unverified.
+- `SECURITY.md` accurately distinguishes implemented/tested controls from planned and externally unverified controls.
+
+**Important boundary:** This is a long-term framework architecture requirement, not authorization to implement every listed control immediately and not a claim of ASVS, OWASP, NIST, SSDF, SLSA, or other compliance. Continue one scoped milestone at a time. Preserve the CivicPulse application while designing the generic framework boundary; remove CivicPulse-specific naming and assumptions only as part of the separately planned framework extraction.
