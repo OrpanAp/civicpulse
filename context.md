@@ -865,6 +865,7 @@ These are planned capabilities, not claims of implementation. Build each subsyst
 - [x] Configurable HTTP security headers — implemented and tested; see section 5.12.
 - [x] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation; implemented and tested locally, including real HTTP checks. See section 5.13.
 - [x] Native PHP session abstraction, environment-driven session configuration, session manager, and session middleware — implemented and locally tested; application integration and persistence across requests verified in section 5.14. Changes remain local and have not been reported as committed or pushed.
+- [x] CSRF token manager, state-changing-request middleware, parsed form-body support, and application integration — implemented and locally tested; see section 5.15. Changes remain local and have not been reported as committed or pushed.
 - [ ] Authentication and authorization middleware when those features are introduced.
 
 ### Milestone 4 — Extensible database and storage foundation
@@ -996,15 +997,9 @@ The CLI is a framework subsystem, not a database driver. It should invoke framew
 
 ### Milestone 9 — Security, sessions, and form protection
 
-- [ ] Secure session abstraction and configurable session storage.
-- [ ] CSRF token generation, storage, validation, and rotation policy.
-- [ ] CSRF middleware for state-changing requests.
-- [ ] Safe template directive such as `@csrf` that renders a hidden CSRF token input.
-- [ ] Output escaping by default in the view/template system.
-- [ ] Password hashing, authentication, authorization, and policies.
-- [ ] Input validation, upload validation, and security-focused tests.
+**Tracking status:** This older milestone checklist is retired because it duplicated implementation records and mixed completed, locally verified, and not-yet-implemented work. The single authoritative security status register and active backlog are in section 5.23. Do not check off security work in this milestone.
 
-The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive should generate a real hidden form field, while middleware validates the submitted token. Template directives must compile to explicit, testable behavior; they must not bypass escaping, authorization, or request validation.
+The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive must generate a real hidden form field backed by the existing CSRF token manager, while middleware validates the submitted token. Template directives must compile to explicit, testable behavior; they must not bypass escaping, authorization, or request validation.
 
 **Planned template syntax / developer shortcuts (Laravel-inspired in ergonomics, independently designed and implemented):**
 
@@ -1014,12 +1009,12 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 - [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
 - [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials, with explicit data passing, predictable scope, nested composition, and safe path resolution.
 - [x] `@components('name', [...])` — implemented reusable component-template invocation with a static quoted component name, optional explicit props array, default and named slots, nested components, isolated props, and escaped interpolation. See section 5.18 for the verified contract.
-- [ ] `@call("include.php/style.css/main.js")` — component/partial-scoped resource loading and registration. When declared at the top of a partial or component template, it can request approved HTML partials, CSS assets, and JavaScript assets for the current component. Define typed resource handling, where and when each asset is emitted, dependency ordering, deduplication, and component scope. The intended priority/override behavior is that an explicitly overriding resource registered for the current component can take precedence over an already registered resource; this must be a controlled registry-level override with deterministic precedence, not an unrestricted filesystem overwrite or arbitrary code execution. Finalize the exact syntax and override rules before implementation.
-- [ ] `@build(html)` — a special rendering/build directive for content whose source may be text stored in the database. Its purpose is to transform supported text-form HTML into renderable output instead of always displaying markup characters literally. This is a security-sensitive trust boundary: database content is untrusted by default. Define an allowlisted HTML subset and sanitizer/validator, preserve context-appropriate escaping, and reject or neutralize unsafe tags, attributes, URLs, embedded event handlers, and script execution. CSS and JavaScript must not become executable merely because they came from the database; any supported CSS/JS build path requires separate explicit policy, validation, and asset handling. Never implement `@build` as raw `eval()`, arbitrary PHP execution, or a blanket escaping bypass.
-- [ ] Keep `@build`, `@call`, and `@components` distinct because they represent different intended responsibilities: safe transformation/rendering of stored markup; loading/registering component resources with controlled precedence; and reusable parameterized component templates. Refine the public grammar and contracts before implementation, including malformed syntax behavior, nested use, caching, scope, and path safety. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
+- [x] `@call([...])` and `@resources('styles'|'scripts')` — implemented with typed static declarations, render-scoped registration, deterministic deduplication/override behavior, and constrained public asset resolution; see section 5.19.
+- [x] `@build($expression)` — implemented as a separate allowlist-based stored-HTML sanitization path; see section 5.20.
+- [x] Keep `@build`, `@call`, and `@components` distinct: safe transformation of stored markup; controlled resource registration; and reusable parameterized component templates. Their implementations and trust boundaries are recorded in sections 5.18–5.20. All component and asset paths must remain constrained to approved roots.
 - [ ] `@auth`, `@guest`, and role/permission directives only after authentication and authorization services exist.
 - [ ] `@error` and validation-error helpers after the validation and form-error contracts exist.
-- [ ] Escaped output by default, with an explicit and carefully controlled raw-output escape hatch.
+- [x] Escaped interpolation by default. `@build` is a separate allowlist-sanitized HTML path, not a general raw-output escape hatch; see sections 5.16 and 5.20.
 - [ ] Compile templates to cached PHP safely; invalidate compiled templates when source changes in development.
 - [ ] Tests for directive parsing, malformed directives, nested blocks, escaping, and generated output.
 
@@ -1184,7 +1179,7 @@ At the end of a meaningful session:
 5. Set the next concrete action.
 6. Keep the README aligned with the actual public-facing project status when necessary.
 
-**Current next action:** Continue from the committed View composition, conditional-directive, and reusable component milestone in sections 5.17–5.18. The next View Engine feature to design is `@call` for controlled, component-scoped resource registration. Before implementation, inspect the current compiler, renderer, component context, and view/resource directory conventions; define resource types, approved roots, output locations, dependency ordering, deduplication, caching, scope, and deterministic override precedence. Keep `@build` separate and defer it until its stored-markup allowlist and sanitization contract is designed. CivicPulse report persistence, authentication, and authorization remain unimplemented. Source-code changes remain user-managed locally; only `context.md` is updated directly on GitHub.
+**Current next action:** Resume the security audit only after the context cleanup is complete. Use section 5.23 as the single authoritative security status register and audit queue. Do not restart completed View work in sections 5.18–5.20 unless the security audit identifies a specific defect. CivicPulse report persistence, authentication, and authorization remain unimplemented. Source-code changes remain user-managed locally; only `context.md` is updated directly on GitHub.
 
 ### 5.14 Session abstraction, configuration, and request lifecycle
 
@@ -1373,9 +1368,9 @@ Implemented:
 - Included partials share the active component context so a component invocation can span supported template composition, while each include still receives its explicit data array and fresh layout-composition context.
 - Component templates cannot declare layout inheritance or sections. Layouts and sections remain page-level composition features.
 - Slot markup originates in trusted application templates. Dynamic interpolations retain normal HTML escaping. Database-originated HTML remains untrusted and must be handled by the future `@build` allowlist/sanitization design.
-- `@call` and `@build` are not implemented. Do not treat component rendering as asset registration or as safe rendering of arbitrary stored markup.
+- The original statement that `@call` and `@build` were not implemented is superseded by sections 5.19 and 5.20. `@call` now provides constrained resource registration and asset resolution; `@build` now provides allowlist-based stored-HTML sanitization. These remain separate security boundaries.
 
-**Next milestone:** design and implement `@call` for component-scoped resource registration. Define its typed resource grammar, approved roots, output placement, dependency ordering, deduplication, cache behavior, component scope, and deterministic override precedence before implementation. Keep `@build` separate and planned until its stored-markup security contract is finalized.
+**Status correction:** Sections 5.19 and 5.20 are the authoritative implementation records. Do not reopen these features as incomplete checklist items unless a new audit finds a concrete defect.
 
 
 ### 5.19 `@call` resource registration and asset resolution
@@ -1504,16 +1499,7 @@ The current `main` branch was inspected after the developer confirmed that `SECU
 - CSP, HSTS, HTTPS enforcement, authentication, authorization, rate limiting, secure uploads, and production deployment verification are not established by the inspected source.
 - The session test file review and broader security review are still being completed. Do not treat this section as a completed security audit or a production-readiness approval.
 
-**Next audit steps:**
-
-1. Finish reviewing the remaining session manager/configuration/middleware tests and their failure/cleanup paths.
-2. Inspect the complete trusted-proxy resolver and its tests, HTTP header parsing edge cases, and middleware exception behavior.
-3. Review database query usage and error/logging behavior for injection, disclosure, and privilege risks.
-4. Review the View sanitizer and asset resolver against their tests and current configuration.
-5. Produce a prioritized findings list with evidence, severity, remediation, and regression tests before adding new security features.
-6. Update this section and `SECURITY.md` only when the next findings are supported by inspected source and test output.
-
-
+**Audit tracking:** This section is the historical initial-inspection record. Its unfinished work and the active audit sequence are consolidated in section 5.23. Do not maintain a second checklist.
 
 ### 5.22 Framework-wide security architecture, compatibility, and scalability requirements
 
@@ -1570,8 +1556,8 @@ Build professional, defense-in-depth security capabilities into the framework it
 
 **Implementation and audit sequence**
 
-1. Finish the current evidence-based audit of sessions, trusted proxies, request parsing, middleware failure paths, database access, logging, View sanitization, and asset resolution. Record findings with severity, evidence, remediation, and regression tests.
-2. Complete the Basic baseline first: validation, output encoding, parameterized persistence, session lifecycle, HTTPS/deployment guidance, authorization enforcement hooks, safe errors, secrets/configuration, dependency hygiene, uploads, security headers, logging, and tested backups.
+1. Complete the evidence-based audit using the active queue and status register in section 5.23. Record findings with severity, source/test evidence, remediation, and regression tests.
+2. Use the Basic baseline gaps in section 5.23 to plan implementation; do not duplicate those items as a second checklist.
 3. Build the Standard layer: centralized authorization, authentication lifecycle, CSRF/browser policy hardening, distributed rate limiting, API schemas/limits, data protection, security-event monitoring, and CI scanning.
 4. Add Advanced capabilities where application threat models require them: tenant isolation, phishing-resistant MFA/passkeys, service identity, managed secrets/keys, runtime controls, fuzzing, and independent assurance.
 5. Establish Professional maintainer practices: SSDF-aligned secure development, signed/provenanced releases, SBOM, vulnerability disclosure/advisories, patch SLAs, incident response, and measured recovery.
@@ -1589,3 +1575,95 @@ Build professional, defense-in-depth security capabilities into the framework it
 - `SECURITY.md` accurately distinguishes implemented/tested controls from planned and externally unverified controls.
 
 **Important boundary:** This is a long-term framework architecture requirement, not authorization to implement every listed control immediately and not a claim of ASVS, OWASP, NIST, SSDF, SLSA, or other compliance. Continue one scoped milestone at a time. Preserve the CivicPulse application while designing the generic framework boundary; remove CivicPulse-specific naming and assumptions only as part of the separately planned framework extraction.
+
+
+### 5.23 Security status register and active audit queue
+
+**Status: Authoritative security tracker, consolidated on 2026-11-08.** This section replaces duplicated security checklists elsewhere in this file. Sections 5.8–5.20 remain the detailed historical implementation records; section 5.21 remains the initial audit snapshot; section 5.22 remains the architecture and maturity requirements. Maintain current completion status and the active backlog only here, and keep `SECURITY.md` aligned with evidence.
+
+**Status meanings**
+
+- **Implemented and committed:** implementation and tests are recorded in this context and the relevant source commit is recorded as pushed.
+- **Implemented and locally verified:** developer-reported local source/tests exist, but the source change has not been confirmed committed and pushed. Do not imply the remote branch contains it.
+- **Partial:** some protection exists, but important lifecycle, coverage, or deployment controls remain.
+- **Not implemented / not verified:** no implementation evidence is recorded here, or the necessary verification has not been performed.
+- **Audit pending:** the feature exists, but its current source, tests, configuration, or integration still needs review before a security conclusion.
+
+**A. Existing controls — do not re-list these as unimplemented**
+
+| Area | Current recorded status | Evidence and limitation |
+|---|---|---|
+| Environment/configuration foundation | Implemented and committed | Environment loader, typed configuration repository, and container/bootstrap integration; section 5.9. Production secret-management policy is still open. |
+| Parameterized database operations | Implemented and committed | PDO connection wrapper supports bound values and transactions; database tests are recorded in section 5.8. Actual application query usage, dynamic SQL identifiers, least-privilege DB credentials, and error disclosure remain in the audit queue. |
+| Middleware pipeline | Implemented and committed | Ordered middleware, short-circuit support, and per-Application registration; section 5.10. |
+| Request IDs and structured request logging | Implemented and committed | Random request IDs, response propagation, structured success/failure records, and logging-failure isolation; section 5.11. Log retention, redaction, remote shipping, alerting, and audit-event coverage are not implemented. |
+| Four baseline response headers | Implemented and committed | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy`; section 5.12. This is not CSP, HSTS, or HTTPS enforcement. |
+| Trusted-proxy and request network metadata | Implemented and committed | Explicit IP/CIDR trust, validated forwarded IP/proto, opt-in forwarded host, host syntax checks, and request metadata; section 5.13. Full resolver and edge-case audit remains pending. |
+| Native PHP session lifecycle | Implemented and locally verified | Session contract, native adapter, validated cookie config, strict mode, cookie-only IDs, middleware ownership/cleanup, and two-request persistence; section 5.14. Source changes are recorded as local-only, not confirmed committed/pushed. |
+| CSRF token and middleware protection | Implemented and locally verified | Random token generation, constant-time validation, unsafe-method enforcement, form/header token support, conflict rejection, 403/no-store, and application integration; section 5.15. Source changes are recorded as local-only, not confirmed committed/pushed. |
+| Default output escaping and safe stored HTML | Implemented and committed | Escaped interpolation and separate allowlist-based `@build` sanitizer with URL and dangerous-element handling; sections 5.16 and 5.20. Do not describe `@build` as unrestricted raw HTML. |
+| Component and resource rendering boundaries | Implemented and committed | Explicit component props/slots, render-scoped `@call` resource registry, constrained asset roots, deterministic deduplication/override, and URL escaping; sections 5.18–5.19. Two symlink checks were environment-limited and skipped on Windows. |
+
+**B. Partial controls and lifecycle gaps**
+
+- **Sessions — Partial:** native PHP session storage is the only recorded adapter. Idle timeout, absolute lifetime, server-side revocation/logout semantics, distributed session storage, and persistent-worker/concurrency verification remain open. `regenerateId()` exists, but no authentication lifecycle currently invokes it after login or privilege changes.
+- **CSRF — Partial:** token generation and validation exist. Authentication-transition rotation, a documented token renewal/invalidation lifecycle, Origin/Referer defense in depth, and the `@csrf` template directive remain open. Do not mark the CSRF lifecycle fully complete.
+- **Request/network boundary — Partial:** trusted proxy resolution and selected forwarded-header duplicate handling exist. Header/body size limits, JSON depth/size limits, centralized input-validation contracts, strict redirect validation, and an SSRF-safe outbound HTTP client are not established.
+- **Database — Partial:** parameterized value operations exist. Safe dynamic identifier/query-builder policy, least-privilege production credentials, engine-specific capability guarantees, and comprehensive application-query review remain open.
+- **Logging/operations — Partial:** request-correlated structured logs exist. Secret/token/PII redaction, security audit events, retention/rotation, remote shipping, monitoring/alerts, backup/restore drills, and incident-response procedures remain open.
+- **View/assets — Implemented with audit caveats:** the recorded escaping, sanitizer, and asset-root controls exist. Their full source/test review is still part of the active audit; environment-limited symlink checks must remain marked as skipped, not passed.
+
+**C. Not implemented or not yet evidenced — active security backlog**
+
+**Basic baseline**
+- [ ] Central input-validation contracts and consistent validation errors.
+- [ ] Request body, JSON depth/size, upload-size, pagination, and resource limits.
+- [ ] Centralized exception handling with generic production responses and safe internal diagnostics.
+- [ ] Authentication lifecycle: password hashing/verification, login/logout, generic failure responses, account recovery, and authentication throttling.
+- [ ] Authorization enforcement: deny-by-default policies/gates, route protection, role/permission contracts, object ownership, and property-level authorization.
+- [ ] Session idle/absolute expiry, logout invalidation, authentication-triggered session ID regeneration, and a documented session lifecycle.
+- [ ] CSRF token rotation/lifecycle, Origin/Referer policy where appropriate, and the `@csrf` form directive.
+- [ ] HTTPS deployment enforcement/guidance and secure production configuration validation. HSTS must only be enabled after HTTPS deployment is confirmed.
+- [ ] CSP with report-only rollout and enforce mode; strict CORS allowlists.
+- [ ] Secure upload/download handling: content/type/size validation, generated names, storage outside public root, and safe download headers.
+- [ ] Secret redaction, security-event audit trail, log retention/rotation, monitoring hooks, tested backup and restore procedures.
+- [ ] Dependency review/update policy and verified Composer lockfile/production dependency practices.
+
+**Standard and advanced layers**
+- [ ] Pluggable rate limiting and quotas for IP, account, token, and route.
+- [ ] Distributed, atomic limiter/session/revocation/lock backends with explicit consistency and expiry guarantees.
+- [ ] API request/response schemas, bounded retries/timeouts, and protections against resource-exhaustion and business-flow abuse.
+- [ ] Data-protection and cryptographic key/provider lifecycle, including rotation; use vetted libraries only.
+- [ ] MFA/passkey extension points and phishing-resistant authentication where justified by the threat model.
+- [ ] Tenant isolation and service identity where required by application architecture.
+- [ ] Fuzzing and broader negative, abuse, concurrency, and failure-path test coverage.
+
+**Professional maintainer and release assurance**
+- [ ] CI dependency, secret, and static-analysis scanning; add dynamic testing where appropriate.
+- [ ] SBOM generation, artifact provenance, and signed release process.
+- [ ] Vulnerability disclosure/advisory process, patch policy/SLAs, incident response, and recovery exercises.
+- [ ] Independent external security assessment before making any external assurance claim.
+
+**Conditional AI integration**
+- [ ] If AI features are introduced: treat model/retrieved content as untrusted; enforce least-privilege tool access; exclude secrets from prompts; bound execution, tokens, and cost; require approval for consequential actions.
+
+**D. Active source audit queue — resume here**
+
+The audit has not yet been restarted after this documentation cleanup. Work through these steps in order; record each result with file paths, relevant code/test evidence, severity, impact, remediation, and regression coverage. A feature is not complete merely because a roadmap item or test name exists.
+
+1. [ ] **Session audit:** inspect the complete session config, manager, native adapter, middleware, all session tests, failure/cleanup paths, PHP session settings, cookie behavior, ID regeneration, and current local-vs-remote source status.
+2. [ ] **CSRF audit:** inspect token manager, middleware, parsed-body behavior, front-controller ordering, full tests, token lifecycle, request methods, malformed/conflicting input, and failure responses.
+3. [ ] **Trusted-proxy/request audit:** inspect the complete resolver and tests, trust-chain parsing, duplicate headers, direct-vs-forwarded scheme/host, IPv4/IPv6/CIDR edge cases, host authorization boundaries, and malformed input behavior.
+4. [ ] **Middleware/error audit:** inspect ordering and exception paths for request IDs, logging, security headers, sessions, CSRF, router short-circuiting, and unhandled exceptions.
+5. [ ] **Database audit:** inspect actual application query call sites, parameter binding, dynamic identifiers, transaction/error handling, connection lifecycle, credential/config exposure, and tests.
+6. [ ] **Logging/config/dependency audit:** inspect secret exposure, log context/redaction, error messages, environment/config validation, Composer dependencies/lockfiles, and operational assumptions.
+7. [ ] **View/asset audit:** inspect escaping, `HtmlSanitizer`, `@build`, component/slot boundaries, `@call`, `AssetResolver`, path traversal/symlink behavior, URL validation, cache behavior, and all relevant tests.
+8. [ ] **Consolidate findings:** produce a severity-ranked report (Critical/High/Medium/Low/Informational) with evidence, exploitability, remediation, compatibility impact, and regression tests. Separate confirmed vulnerabilities from hardening opportunities and unverified assumptions.
+
+**Tracking rules**
+
+- This section is the only active security status checklist in `context.md`. Other sections may preserve historical implementation details, architecture requirements, or link here, but must not maintain a second copy of these open items.
+- Mark a feature **implemented** only after source inspection. Mark it **tested** only with actual test output. Mark it **committed** only with a verified commit on the intended branch. Mark it **production-verified** only with deployment evidence.
+- Preserve the distinction between locally implemented/uncommitted session and CSRF work and committed remote controls until Git evidence changes that status.
+- When a backlog item is implemented, update its status here and add a detailed implementation record in the relevant milestone. Do not leave an old unchecked duplicate elsewhere.
+- Do not claim OWASP/NIST/SSDF/SLSA compliance, production readiness, or independent assurance from this tracker alone.
