@@ -2,7 +2,7 @@
 
 > **Purpose of this file:** Preserve the project's original motivation, current technical state, decisions, and next actions. Update this file as work is completed so development can continue across sessions without relying on chat history.
 
-**Last updated:** 2026-11-07  
+**Last updated:** 2026-11-08  
 **Repository:** https://github.com/OrpanAp/civicpulse  
 **Default branch:** `main`  
 **Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, trusted-proxy handling, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet implemented.
@@ -1409,3 +1409,48 @@ Implemented:
 **Definition of Done:** The typed `@call` and `@resources` directives, secure public asset resolution, render-scoped resource registration, deterministic deduplication/override behavior, and integration with pages, layouts, partials, and nested components are implemented, tested, committed, and pushed. The remaining symlink checks are explicitly environment-limited, not reported as passing.
 
 **Next milestone:** Keep `@build` separate. Before implementing it, design the stored-markup trust boundary, allowed HTML elements/attributes, URL and attribute validation, sanitization strategy, and tests. Do not use `@call` or slot rendering as a substitute for that security contract.
+
+### 5.20 `@build` safe stored-markup rendering
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `f0ee836` (`Add safe stored HTML rendering with build directive`) on 2026-11-08.** The developer confirmed that local `main`, `origin/main`, and `origin/HEAD` point to `f0ee836`, and `git status -sb` reported `## main...origin/main` with a clean working tree.
+
+**Implemented behavior:**
+
+- [x] Added `HtmlSanitizer` as a dedicated View-layer service for untrusted HTML stored in application data.
+- [x] Added the `@build($expression)` template directive. It accepts exactly one non-empty PHP expression and compiles to the dedicated `View::build()` method.
+- [x] Added `View::build(string $html)`, delegating to the sanitizer. The View constructor accepts an optional sanitizer as its sixth argument, preserving the existing constructor argument order and compatibility.
+- [x] Registered `HtmlSanitizer` as a container singleton in `bootstrap/app.php`.
+- [x] Kept ordinary `{{ ... }}` interpolation unchanged and escaped. `@build` is an explicit, separate path for restricted HTML output.
+- [x] Allowed only the documented formatting/content elements: paragraphs, generic text containers, line breaks/rules, headings h2–h4, emphasis/strong formatting, small text, lists, blockquotes, code, preformatted text, and anchors.
+- [x] Allowed only `href` and `title` on anchors; all other attributes are removed. No styles, classes, IDs, event handlers, data attributes, embedded media, images, forms, SVG, or interactive elements are allowed.
+- [x] Removed dangerous elements and their descendants, including scripts, styles, frames, objects, embedded media, SVG/MathML, forms and controls, and document-level resource elements.
+- [x] Unwrapped unsupported harmless elements while preserving sanitized safe child content.
+- [x] Validated anchor URLs, rejecting dangerous schemes, protocol-relative URLs, malformed percent encoding, control characters, backslash ambiguity, and credential-bearing or hostless HTTP(S) URLs. Safe HTTP(S), root-relative, relative, query, and fragment references are supported under the implemented policy.
+- [x] Enforced a 100 KB input limit and valid UTF-8 before parsing.
+- [x] Used PHP's `Dom\\HTMLDocument::createFromString()` with explicit UTF-8 parsing, then recursively sanitized the DOM tree and serialized only the sanitized body contents. No regex-based HTML sanitization, `eval()`, or arbitrary PHP execution was introduced.
+- [x] Added dedicated sanitizer, compiler, and View integration tests, including malformed markup, nested dangerous content, encoded URL attacks, invalid UTF-8, and oversized input.
+- [x] Added automatic cleanup of temporary files/directories created by `tests/view_build.php`.
+
+**Security and architecture decisions:**
+
+- Database-originated HTML is always untrusted, even when it is rendered through `@build`. Sanitization is performed on every render; there is no sanitizer output cache in this version.
+- `HtmlEscaper` remains unchanged and continues to protect ordinary escaped interpolation.
+- `@build` is not a general raw-output escape hatch. Its output is restricted to the explicit element, attribute, and URL allowlists implemented by `HtmlSanitizer`.
+- Dangerous elements are removed with their entire subtrees; unsupported harmless wrappers are unwrapped only after their descendants have been sanitized.
+- The sanitizer is a View service and does not change the behavior or security contract of `@call`, components, slots, or asset registration.
+- PHP 8.5's `Dom\\HTMLDocument::createFromString()` rejected `LIBXML_NONET` as an unsupported flag in the developer's environment; the implementation uses the supported flags value `0` with explicit UTF-8. Do not add unsupported flags without checking the API contract.
+
+**Developer-reported verification on 2026-11-08:**
+
+- [x] PHP syntax checks passed for all seven changed/new files: `bootstrap/app.php`, `framework/src/View/Compiler/Compiler.php`, `framework/src/View/View.php`, `framework/src/View/HtmlSanitizer.php`, `tests/html_sanitizer.php`, `tests/view_build.php`, and `tests/view_compiler.php`.
+- [x] `tests/html_sanitizer.php` — 38 passed, 0 failed.
+- [x] `tests/view_build.php` — 11 passed, 0 failed.
+- [x] `tests/view_compiler.php` — 83 passed, 0 failed.
+- [x] The complete regression loop ran all 38 PHP test scripts (excluding the autoload helper) and reported `RESULT: PASS` for every script. Other reported suite counts included `asset_resolver.php` 14, `compiled_view_cache.php` 11, `html_escaper.php` 13, `view.php` 13, `view_composition.php` 22, `view_finder.php` 10, `view_renderer.php` 11, `view_resource_context.php` 10, `view_resource_integration.php` 12, and `view_resources.php` 20; all had zero reported failures.
+- [x] The final regression log was removed after review. `git diff --check` and `git diff --cached --check` produced no errors.
+- [x] Exactly seven intended files were staged: four modified and three new. The staged diff contained 920 insertions and one deletion.
+- [x] Commit `f0ee836` was already present on `main` and `origin/main`; the subsequent commit and push commands correctly reported nothing to commit and everything up-to-date. Final status was clean.
+
+**Definition of Done:** The explicit `@build` directive, View integration, allowlist-based stored-HTML sanitization, dangerous subtree removal, safe URL handling, and dedicated regression coverage are implemented, tested across the complete 38-script suite, committed, and pushed.
+
+**Next milestone:** Resume CivicPulse product work rather than expanding the template subsystem indefinitely. Inspect the current repository and application requirements before choosing the next complete milestone; prioritize the first real report workflow and its persistence, validation, authorization, and tests. Do not claim report persistence or end-to-end civic reporting is implemented until it is built and verified.
