@@ -640,6 +640,52 @@ $assertThrows(
     'Rejects extra resource output arguments'
 );
 
+// @build: Compile a basic HTML expression.
+$assert(
+    $compiler->compile('@build($html)')
+        === '<?= $view->build($html) ?>',
+    'Compiles a basic @build expression'
+);
+
+// @build: Compile array access.
+$assert(
+    $compiler->compile("@build(\$report['description'])")
+        === "<?= \$view->build(\$report['description']) ?>",
+    'Compiles array access in @build'
+);
+
+// @build: Compile nested expressions.
+$assert(
+    $compiler->compile('@build(trim($data["html"]))')
+        === '<?= $view->build(trim($data["html"])) ?>',
+    'Compiles nested function calls in @build'
+);
+
+// @build: Compile null coalescing.
+$assert(
+    $compiler->compile("@build(\$html ?? '')")
+        === "<?= \$view->build(\$html ?? '') ?>",
+    'Compiles null coalescing in @build'
+);
+
+// @build: Reject empty expressions.
+$assertThrows(
+    static fn() => $compiler->compile('@build()'),
+    'Rejects an empty @build expression'
+);
+
+// @build: Reject multiple top-level arguments.
+$assertThrows(
+    static fn() => $compiler->compile('@build($first, $second)'),
+    'Rejects multiple @build arguments'
+);
+
+// @build: Reject an unclosed directive.
+$assertThrows(
+    static fn() => $compiler->compile('@build($html'),
+    'Rejects an unclosed @build directive'
+);
+
 echo "\nPassed: {$passed}\n";
 echo "Failed: {$failed}\n";
 

@@ -10,17 +10,22 @@ class View
 
     private HtmlEscaper $escaper;
 
+    private HtmlSanitizer $htmlSanitizer;
+
     public function __construct(
         private ViewFinder $finder,
         private ViewRenderer $renderer,
         ?ComponentRenderer $componentRenderer = null,
         private ?AssetResolver $assetResolver = null,
-        ?HtmlEscaper $escaper = null
+        ?HtmlEscaper $escaper = null,
+        ?HtmlSanitizer $htmlSanitizer = null
     ) {
         $this->componentRenderer = $componentRenderer
             ?? new ComponentRenderer($finder, $renderer);
 
         $this->escaper = $escaper ?? new HtmlEscaper();
+
+        $this->htmlSanitizer = $htmlSanitizer ?? new HtmlSanitizer();
     }
 
     public function render(
@@ -338,6 +343,17 @@ class View
         }
 
         return implode(PHP_EOL, $output);
+    }
+
+    /**
+     * Sanitize and render untrusted stored HTML.
+     *
+     * Unlike ordinary interpolation, this explicitly permits a
+     * restricted set of HTML elements and attributes.
+     */
+    public function build(string $html): string
+    {
+        return $this->htmlSanitizer->sanitize($html);
     }
 
     public function renderComponent(

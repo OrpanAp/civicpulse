@@ -24,6 +24,7 @@ final class Compiler
             '@include(',
             '@call(',
             '@resources(',
+            '@build(',
             '@extends(',
             '@section(',
             '@yield(',
@@ -591,6 +592,27 @@ final class Compiler
                 $compiled .= '<?= $view->resources(\''
                     . $resourceType
                     . '\', $__resourceContext) ?>';
+            }
+
+            // Compile @build.
+            elseif ($nextDirective === '@build(') {
+                if (count($arguments) !== 1) {
+                    throw new ViewException(
+                        '@build accepts exactly one HTML expression.'
+                    );
+                }
+
+                $htmlExpression = trim($arguments[0]);
+
+                if ($htmlExpression === '') {
+                    throw new ViewException(
+                        '@build HTML expression cannot be empty.'
+                    );
+                }
+
+                $compiled .= '<?= $view->build('
+                    . $htmlExpression
+                    . ') ?>';
             }
 
             $position = $closingPosition + 1;

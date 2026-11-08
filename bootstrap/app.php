@@ -21,6 +21,7 @@ use CivicPulse\Framework\View\ViewFinder;
 use CivicPulse\Framework\View\ViewRenderer;
 use CivicPulse\Framework\View\ComponentRenderer;
 use CivicPulse\Framework\View\AssetResolver;
+use CivicPulse\Framework\View\HtmlSanitizer;
 
 $basePath = dirname(__DIR__);
 
@@ -104,6 +105,9 @@ $container->singleton(
 
 // HTML escaping service.
 $container->singleton(HtmlEscaper::class);
+
+// Sanitize untrusted HTML stored in application data.
+$container->singleton(HtmlSanitizer::class);
 
 // Locate templates inside resources/views.
 $container->singleton(
