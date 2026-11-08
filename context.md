@@ -108,6 +108,25 @@ The user confirmed the following access and workflow rules for the CivicPulse re
 
 These boundaries apply across future CivicPulse development sessions.
 
+### 2.2 Independent framework extraction and repository strategy
+
+The framework being developed inside CivicPulse must eventually become a genuinely independent, reusable PHP framework. It must not depend on CivicPulse or contain CivicPulse-specific application code.
+
+Agreed direction:
+
+- The framework will be extracted/copied into its own separate Git repository when its foundation is ready.
+- The standalone repository must contain the framework itself, its framework-specific Composer/package configuration, framework tests, documentation, and only generic examples or fixtures needed to develop and verify it.
+- Do not include CivicPulse application code, civic-reporting domain models, report workflows, CivicPulse routes/controllers/views, application-specific configuration, database records, secrets, or other product-specific assets in the standalone framework repository.
+- Framework namespaces, service contracts, bootstrap APIs, configuration, and tests must be usable without loading or referencing CivicPulse.
+- Keep framework abstractions generic. If a capability is needed only by CivicPulse, implement it in CivicPulse's application layer unless it is a genuinely reusable framework capability.
+- CivicPulse should ultimately consume the standalone framework as a dependency rather than being the framework's source of truth. Choose and document the distribution/versioning approach (for example, a Composer VCS package or a local path repository during development) when extraction is planned.
+- Preserve CivicPulse's existing repository and development history. Do not move, rename, or delete framework files from CivicPulse as part of the initial backup/extraction without an explicit migration plan.
+- Before treating the standalone copy as production-reusable, verify its independence with a clean clone and standalone Composer install/autoload, framework test suite, and a small generic application that does not reference CivicPulse.
+- The separate repository is intended to be a durable independent copy for reuse and backup. Creating that repository does not by itself mean the framework is production-ready; production readiness requires documented compatibility, security review, release/versioning discipline, and verified tests.
+
+This is a planned architectural direction. The framework has not yet been extracted into a separate repository, and no standalone repository or production-ready release is claimed to exist.
+
+
 ---
 
 ## 3. Current Environment
@@ -1453,4 +1472,4 @@ Implemented:
 
 **Definition of Done:** The explicit `@build` directive, View integration, allowlist-based stored-HTML sanitization, dangerous subtree removal, safe URL handling, and dedicated regression coverage are implemented, tested across the complete 38-script suite, committed, and pushed.
 
-**Next milestone:** Resume CivicPulse product work rather than expanding the template subsystem indefinitely. Inspect the current repository and application requirements before choosing the next complete milestone; prioritize the first real report workflow and its persistence, validation, authorization, and tests. Do not claim report persistence or end-to-end civic reporting is implemented until it is built and verified.
+**Next milestone:** Plan the framework's independent extraction before treating it as a reusable production dependency. First inspect the current framework source, Composer configuration, tests, and internal dependencies to identify any CivicPulse coupling. Define a clean standalone package boundary and extraction checklist; do not create or push the separate repository until the framework can be installed, bootstrapped, and tested without CivicPulse. Preserve the current CivicPulse repository as-is during this planning stage.
