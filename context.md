@@ -1022,11 +1022,8 @@ The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syn
 
 ### Milestone 10 — Traffic management, rate limiting, and load balancing
 
-- [ ] Rate-limiter contract with configurable limits and windows.
-- [ ] In-memory limiter for tests and single-process development.
-- [ ] Redis-backed distributed limiter for multiple application instances.
-- [ ] Per-IP, per-user, and per-route policies with trusted-proxy safeguards.
-- [ ] HTTP throttling middleware and correct 429 responses/headers.
+**Rate-limiting status:** The rate-limiter contract, adapters, policies, middleware, and distributed atomic behavior are tracked only in section 5.23. This milestone does not maintain a duplicate rate-limiting checklist.
+
 - [ ] Application-level read/write database routing.
 - [ ] Health checks, failure detection, and configurable failover.
 - [ ] Reverse-proxy/load-balancer deployment support and trusted forwarded headers.
@@ -1055,10 +1052,10 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 
 ### Milestone 13 — Production readiness
 
-- [ ] Security review and threat modelling.
-- [ ] Structured logging, metrics, tracing, and monitoring.
+**Security review, threat modelling, security logging/monitoring, and backup/restore controls:** tracked in the authoritative security register in section 5.23.
+
+- [x] Structured request logging and request correlation — implemented and tested; see section 5.11. Metrics, tracing, monitoring, and alert integration remain open.
 - [ ] Performance and concurrency testing.
-- [ ] Backup, restore, and disaster-recovery strategy.
 - [ ] Deployment configuration and CI/CD.
 - [ ] Multi-instance deployment and infrastructure health checks.
 - [ ] Operational and developer documentation.
@@ -1067,13 +1064,15 @@ Load balancing must be treated at the correct layer: a reverse proxy/load balanc
 
 **Authentication and identity foundation**
 
-- [ ] Implement secure authentication flows: registration where enabled, login/logout, password hashing, password change/reset, session rotation, remember-me only with a reviewed token design, and account status/lockout policies.
-- [ ] Define user identity and account models with validated fields, unique identifiers, safe serialization, and protected credential handling.
-- [ ] Implement authorization independently from authentication. A signed-in user is not automatically authorized to perform an action.
-- [ ] Implement roles and permissions with explicit many-to-many relationships, permission naming conventions, role assignment/revocation, and deterministic permission evaluation.
-- [ ] Add policies or equivalent resource-aware authorization for actions such as view, create, update, delete, verify, assign, publish, and administer.
-- [ ] Enforce authorization in the server-side request/controller/service layer for every protected operation. UI visibility and template directives are convenience features only.
-- [ ] Test unauthenticated, authenticated-but-forbidden, permitted, revoked-permission, inactive-account, and cross-user/resource access cases.
+**Status tracking:** Authentication, authorization, session integration, and their security tests are tracked only in section 5.23. The following bullets describe required CivicPulse admin/product behavior; they are not a separate completion checklist.
+
+- Implement secure authentication flows: registration where enabled, login/logout, password hashing, password change/reset, session rotation, remember-me only with a reviewed token design, and account status/lockout policies.
+- Define user identity and account models with validated fields, unique identifiers, safe serialization, and protected credential handling.
+- Implement authorization independently from authentication. A signed-in user is not automatically authorized to perform an action.
+- Implement roles and permissions with explicit many-to-many relationships, permission naming conventions, role assignment/revocation, and deterministic permission evaluation.
+- Add policies or equivalent resource-aware authorization for actions such as view, create, update, delete, verify, assign, publish, and administer.
+- Enforce authorization in the server-side request/controller/service layer for every protected operation. UI visibility and template directives are convenience features only.
+- Test unauthenticated, authenticated-but-forbidden, permitted, revoked-permission, inactive-account, and cross-user/resource access cases.
 
 **Built-in administrative application**
 
@@ -1471,7 +1470,7 @@ Implemented:
 
 ### 5.21 Security documentation alignment and initial code audit
 
-**Status: Documentation updated; source-level security audit in progress (2026-11-08).**
+**Status: Initial source-inspection snapshot recorded on 2026-11-08; active audit work is queued in section 5.23.**
 
 The current `main` branch was inspected after the developer confirmed that `SECURITY.md` had been committed and pushed in commit `28a7726` (`Security testing features finalization and adopters`).
 
@@ -1503,7 +1502,7 @@ The current `main` branch was inspected after the developer confirmed that `SECU
 
 ### 5.22 Framework-wide security architecture, compatibility, and scalability requirements
 
-**Status: Adopted as an architectural requirement and roadmap; implementation and verification are pending. (2026-11-08)**
+**Status: Architecture principles adopted on 2026-11-08. Implementation and verification status is tracked capability-by-capability in section 5.23.**
 
 The developer supplied `SECURITY-REQUIREMENTS-README.md` as the security baseline for CivicPulse and the planned reusable Power PHP Framework. Its four maturity levels (Basic, Standard, Advanced, Professional), beginner glossary, OWASP/MITRE/NIST/SSDF/SLSA/CISA references, framework-specific requirements, and testing expectations are the planning basis for this milestone. The checklist is a requirements source, not proof that CivicPulse or the framework currently meets any standard or certification.
 
@@ -1619,7 +1618,7 @@ Build professional, defense-in-depth security capabilities into the framework it
 - [ ] Central input-validation contracts and consistent validation errors.
 - [ ] Request body, JSON depth/size, upload-size, pagination, and resource limits.
 - [ ] Centralized exception handling with generic production responses and safe internal diagnostics.
-- [ ] Authentication lifecycle: password hashing/verification, login/logout, generic failure responses, account recovery, and authentication throttling.
+- [ ] Authentication lifecycle: validated identity/account models; password hashing/verification; registration where enabled; login/logout; password change/reset and account recovery; generic failure responses; throttling/lockout policy; account status handling; and reviewed remember-me token design if introduced.
 - [ ] Authorization enforcement: deny-by-default policies/gates, route protection, role/permission contracts, object ownership, and property-level authorization.
 - [ ] Session idle/absolute expiry, logout invalidation, authentication-triggered session ID regeneration, and a documented session lifecycle.
 - [ ] CSRF token rotation/lifecycle, Origin/Referer policy where appropriate, and the `@csrf` form directive.
