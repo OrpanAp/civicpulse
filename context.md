@@ -1473,3 +1473,43 @@ Implemented:
 **Definition of Done:** The explicit `@build` directive, View integration, allowlist-based stored-HTML sanitization, dangerous subtree removal, safe URL handling, and dedicated regression coverage are implemented, tested across the complete 38-script suite, committed, and pushed.
 
 **Next milestone:** Plan the framework's independent extraction before treating it as a reusable production dependency. First inspect the current framework source, Composer configuration, tests, and internal dependencies to identify any CivicPulse coupling. Define a clean standalone package boundary and extraction checklist; do not create or push the separate repository until the framework can be installed, bootstrapped, and tested without CivicPulse. Preserve the current CivicPulse repository as-is during this planning stage.
+
+### 5.21 Security documentation alignment and initial code audit
+
+**Status: Documentation updated; source-level security audit in progress (2026-11-08).**
+
+The current `main` branch was inspected after the developer confirmed that `SECURITY.md` had been committed and pushed in commit `28a7726` (`Security testing features finalization and adopters`).
+
+**Documentation review:**
+
+- [x] Reviewed the existing `SECURITY.md`. Its original content was a generic web-security checklist and did not distinguish implemented CivicPulse controls from planned controls.
+- [x] Reworked `SECURITY.md` into a project-specific security posture and production-readiness checklist.
+- [x] Documented the controls confirmed in current source: four HTTP response headers, opt-in trusted-proxy handling, native session hardening, CSRF token validation and middleware ordering, escaped template interpolation, allowlist-based stored-HTML sanitization, and constrained asset resolution.
+- [x] Explicitly listed controls that remain absent or unverified, including CSP, HSTS/HTTPS enforcement, authentication, authorization/RBAC, rate limiting, session expiration, authentication-triggered session ID regeneration, CSRF token rotation, upload security, and production deployment verification.
+- [x] Preserved the distinction between source-code presence, automated test evidence, and production security verification.
+
+**Initial source inspection:**
+
+- [x] Confirmed that `SessionManager` enables PHP strict mode, cookies-only session IDs, disables transparent session ID propagation, configures HttpOnly/SameSite/Secure cookie attributes, and closes sessions through the middleware lifecycle.
+- [x] Confirmed that `CsrfMiddleware` requires an attached session for non-safe methods, accepts the token through the designated header or parsed form field, rejects contradictory values, and returns a non-cacheable 403 response for invalid requests.
+- [x] Confirmed that the front controller registers `SessionMiddleware` before `CsrfMiddleware`.
+- [x] Confirmed that `Request` ignores conflicting separately exposed duplicates of the selected forwarded headers and that proxy metadata resolution is delegated to the configured `TrustedProxyResolver`.
+- [x] Confirmed that the current trusted-proxy configuration defaults to an empty proxy list and disables forwarded-host trust.
+
+**Audit findings and open questions — not yet final conclusions:**
+
+- Session ID regeneration exists as a session abstraction capability, but no authentication flow currently exists to invoke it after login or privilege changes.
+- Idle and absolute session expiration are not implemented in the inspected session manager/configuration.
+- CSRF token rotation around authentication transitions and Origin/Referer validation defense in depth remain open.
+- CSP, HSTS, HTTPS enforcement, authentication, authorization, rate limiting, secure uploads, and production deployment verification are not established by the inspected source.
+- The session test file review and broader security review are still being completed. Do not treat this section as a completed security audit or a production-readiness approval.
+
+**Next audit steps:**
+
+1. Finish reviewing the remaining session manager/configuration/middleware tests and their failure/cleanup paths.
+2. Inspect the complete trusted-proxy resolver and its tests, HTTP header parsing edge cases, and middleware exception behavior.
+3. Review database query usage and error/logging behavior for injection, disclosure, and privilege risks.
+4. Review the View sanitizer and asset resolver against their tests and current configuration.
+5. Produce a prioritized findings list with evidence, severity, remediation, and regression tests before adding new security features.
+6. Update this section and `SECURITY.md` only when the next findings are supported by inspected source and test output.
+
