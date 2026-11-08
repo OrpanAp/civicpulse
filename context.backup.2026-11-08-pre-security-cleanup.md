@@ -1,0 +1,1591 @@
+# CivicPulse — Project Context & Development Tracker
+
+> **Purpose of this file:** Preserve the project's original motivation, current technical state, decisions, and next actions. Update this file as work is completed so development can continue across sessions without relying on chat history.
+
+**Last updated:** 2026-11-08  
+**Repository:** https://github.com/OrpanAp/civicpulse  
+**Default branch:** `main`  
+**Project status:** Early development — HTTP lifecycle, middleware pipeline, request IDs and structured HTTP request logging, configurable HTTP security headers, trusted-proxy handling, multi-driver PDO database foundation, environment/configuration loading, dependency injection, and container-based application bootstrap have been implemented, tested locally, committed, and pushed to `main`. CivicPulse report persistence is not yet implemented.
+
+---
+
+## 1. Why We Started CivicPulse
+
+CivicPulse was started with two connected ambitions.
+
+### 1.1 Build a real-world product
+
+We do not want to spend the project building another traditional task manager, tutorial CRUD application, or collection of disconnected practice scripts.
+
+We want to build a civic infrastructure reporting platform that addresses recognizable community problems. People should eventually be able to report issues such as:
+
+- Potholes, damaged roads, and unsafe public infrastructure
+- Water supply interruptions, drainage, and flooding problems
+- Power outages and damaged electrical infrastructure
+- Waste collection and sanitation problems
+- Other local public-service disruptions
+
+The intended product should support a meaningful lifecycle:
+
+1. A citizen reports a problem with a description, category, and location.
+2. The report can include supporting evidence such as photographs.
+3. Reports can be reviewed and verified.
+4. Similar reports can be identified and grouped to avoid duplicate records.
+5. Issues can be prioritized and assigned to the appropriate people or teams.
+6. Progress can be tracked through investigation and resolution.
+7. Important actions and status changes can be audited.
+8. Citizens can receive updates, while aggregated data can help reveal recurring problems.
+
+These are product goals. They are **not** claims that these features have already been implemented.
+
+### 1.3 Provide a built-in administrative experience
+
+CivicPulse should include a first-party, customizable dashboard and admin panel with the convenience and completeness of Django's built-in admin, while being independently designed and implemented as part of this project. It should not be an afterthought or a third-party dependency. The administrative experience should eventually let authorized staff manage the platform and its civic data through a secure web interface.
+
+The intended capabilities include:
+
+- A configurable dashboard with useful operational summaries, report statistics, pending reviews, workload, recent activity, and actionable alerts.
+- User administration, account status management, authentication, password reset/change flows, and secure session handling.
+- Role-based access control (RBAC), permissions, role assignment, permission checks, and policies for resource- and action-level authorization.
+- Distinct citizen, reviewer, staff, administrator, and other roles only where actual workflows require them; do not rely on hiding UI controls as an authorization mechanism.
+- Administrative resource screens with search, filtering, sorting, pagination, detail views, safe create/update actions, bulk actions where appropriate, and validation feedback.
+- Management of report categories, reports, assignments, review queues, status transitions, and reference data according to the current user's permissions.
+- Audit trails for sensitive administrative actions, clear attribution, and safe handling of personal data.
+- Extensible dashboard widgets, navigation, resource definitions, and reusable UI components so application developers can tailor the admin experience without forking framework internals.
+- Responsive, accessible layouts, clear empty/error/loading states, and safe defaults suitable for real operational use.
+
+This is a product and framework requirement, not a claim that authentication, authorization, RBAC, dashboard pages, or admin CRUD are implemented today. Build it on explicit authentication, authorization, policy, session, validation, and audit services; never treat a hidden menu item or template directive as a security boundary.
+
+
+
+The second ambition is equally important: build the PHP framework that powers CivicPulse rather than using Laravel or another full-stack framework to do the work for us.
+
+The purpose is to understand and implement the engineering concepts behind a modern PHP framework through a substantial application:
+
+- HTTP request and response lifecycle
+- Routing and dispatch
+- Application bootstrap and front controller
+- Dependency injection and service management
+- Middleware pipeline
+- Database connections and query building
+- Models and migrations
+- Validation, authentication, authorization, and security
+- Events and other reusable application services
+
+The framework should solve actual needs that arise while building CivicPulse. We should not create abstractions just to increase the number of classes or files.
+
+**The original motivation in one sentence:** Build a useful civic infrastructure reporting product while learning how to engineer the PHP framework underneath it, through complete, working features rather than tutorial-sized exercises.
+
+---
+
+## 2. Development Rules We Agreed On
+
+These rules are important because the earlier learning process spent too much time on tiny isolated scripts and repeated checkpoints.
+
+1. **Build complete milestones.** Prefer a working request-to-response flow or a complete reporting feature over many disconnected micro-exercises.
+2. **Explain the architecture.** Explain why a class or layer exists, what responsibility it owns, and how it collaborates with other parts.
+3. **Teach while implementing.** Explain PHP and framework concepts when they become relevant. Do not turn every small detail into a separate lesson or quiz.
+4. **Do not skip necessary steps.** Provide exact file paths, code, commands, and ways to test the result.
+5. **Test observable behavior.** A milestone is not complete merely because files exist or code looks plausible. Run it and verify its behavior.
+6. **Keep the project honest.** Document what works, what is incomplete, and what is only planned. Never present planned functionality as implemented.
+7. **Avoid unnecessary rewrites.** Respect existing decisions unless there is a clear technical reason to change them. Explain that reason before changing architecture.
+8. **Keep CivicPulse central.** Framework work should enable the real civic product, not become an endless framework-building exercise.
+9. **Track progress here.** Update the status, decisions, and next actions in this file at the end of meaningful milestones.
+
+
+### 2.1 Repository access and development boundaries
+
+The user confirmed the following access and workflow rules for the CivicPulse repository:
+
+- Repository: https://github.com/OrpanAp/civicpulse
+- Repository files other than `context.md` are read-only for the assistant. The assistant may inspect, read, analyze, and discuss source code, tests, configuration, and documentation, but must not create, edit, delete, or otherwise write those files directly through GitHub.
+- `context.md` is the only repository file the assistant may read and update directly on GitHub. Use it to preserve verified project context, decisions, milestones, and next actions.
+- All source-code development and changes must be performed locally by the user. The assistant should provide instructions and code for the user to apply locally, then review the resulting output.
+- Do not modify `role.md` or any other repository file unless the user explicitly changes this restriction.
+- Application templates must use the project's supported template directives for composition and rendering. Do not instruct the developer to embed raw PHP rendering calls such as `<?= $view->render(...) ?>` in application templates; PHP generated internally by the compiler is a separate implementation detail.
+- Before updating `context.md`, fetch its latest version and use its current blob SHA. Preserve the complete existing content and make only the intended, narrowly scoped change.
+- Never claim that local files were changed, tests were run, commits were created, pushes succeeded, or local and remote branches are synchronized unless the user or reliable tool output verifies that result.
+
+These boundaries apply across future CivicPulse development sessions.
+
+### 2.2 Independent framework extraction and repository strategy
+
+The framework being developed inside CivicPulse must eventually become a genuinely independent, reusable PHP framework. It must not depend on CivicPulse or contain CivicPulse-specific application code.
+
+Agreed direction:
+
+- The framework will be extracted/copied into its own separate Git repository when its foundation is ready.
+- The standalone repository must contain the framework itself, its framework-specific Composer/package configuration, framework tests, documentation, and only generic examples or fixtures needed to develop and verify it.
+- Do not include CivicPulse application code, civic-reporting domain models, report workflows, CivicPulse routes/controllers/views, application-specific configuration, database records, secrets, or other product-specific assets in the standalone framework repository.
+- Framework namespaces, service contracts, bootstrap APIs, configuration, and tests must be usable without loading or referencing CivicPulse.
+- Keep framework abstractions generic. If a capability is needed only by CivicPulse, implement it in CivicPulse's application layer unless it is a genuinely reusable framework capability.
+- CivicPulse should ultimately consume the standalone framework as a dependency rather than being the framework's source of truth. Choose and document the distribution/versioning approach (for example, a Composer VCS package or a local path repository during development) when extraction is planned.
+- Preserve CivicPulse's existing repository and development history. Do not move, rename, or delete framework files from CivicPulse as part of the initial backup/extraction without an explicit migration plan.
+- Before treating the standalone copy as production-reusable, verify its independence with a clean clone and standalone Composer install/autoload, framework test suite, and a small generic application that does not reference CivicPulse.
+- The separate repository is intended to be a durable independent copy for reuse and backup. Creating that repository does not by itself mean the framework is production-ready; production readiness requires documented compatibility, security review, release/versioning discipline, and verified tests.
+
+This is a planned architectural direction. The framework has not yet been extracted into a separate repository, and no standalone repository or production-ready release is claimed to exist.
+
+
+---
+
+## 3. Current Environment
+
+Known development environment:
+
+- Operating system: Windows 11
+- Terminal: Git Bash / MSYS2 UCRT64
+- PHP CLI: 8.5.12
+- Composer: 2.10.3
+- Git: installed and working
+- Editor: Visual Studio Code
+
+Project directory used locally:
+
+```text
+~/Desktop/PHP OOP/Project/Power PHP Framework/civicpulse
+```
+
+Repository:
+
+```text
+https://github.com/OrpanAp/civicpulse
+```
+
+Do not rerun the original directory setup batch file. The project structure already exists; running the setup script again may create nested directories.
+
+---
+
+## 4. Current Repository Structure
+
+The following is the structure observed from the developer's local inspection on 2026-11-06. It reflects the actual directories and files reported at that checkpoint, including local, uncommitted session and CSRF work. It is not a claim that those local changes are already present on GitHub.
+
+```text
+civicpulse/
+├── config/
+│   ├── database.php
+│   ├── security.php
+│   ├── session.php
+│   └── trusted_proxies.php
+├── framework/
+│   └── src/
+│       ├── Application/
+│       │   └── Application.php
+│       ├── Configuration/
+│       │   ├── ConfigRepository.php
+│       │   └── Environment.php
+│       ├── Container/
+│       │   ├── Container.php
+│       │   └── ContainerException.php
+│       ├── Database/
+│       │   ├── Contracts/
+│       │   ├── Drivers/
+│       │   ├── Connection.php
+│       │   ├── ConnectionFactory.php
+│       │   ├── DatabaseConfig.php
+│       │   └── DatabaseManager.php
+│       ├── Http/
+│       │   ├── Contracts/
+│       │   ├── Middleware/
+│       │   │   ├── CsrfMiddleware.php
+│       │   │   ├── MiddlewareInterface.php
+│       │   │   ├── MiddlewarePipeline.php
+│       │   │   ├── MiddlewareRequestHandler.php
+│       │   │   ├── RequestIdMiddleware.php
+│       │   │   ├── RequestLoggingMiddleware.php
+│       │   │   ├── SecurityHeadersMiddleware.php
+│       │   │   └── SessionMiddleware.php
+│       │   ├── Request.php
+│       │   ├── Response.php
+│       │   └── TrustedProxyResolver.php
+│       ├── Logging/
+│       │   ├── ErrorLogLogger.php
+│       │   └── LoggerInterface.php
+│       ├── Routing/
+│       │   ├── Router.php
+│       │   └── web.php
+│       ├── Security/
+│       │   └── Csrf/
+│       │       └── CsrfTokenManager.php
+│       └── Session/
+│           ├── NativeSession.php
+│           ├── SessionInterface.php
+│           └── SessionManager.php
+├── bootstrap/
+│   └── app.php
+├── public/
+│   └── index.php
+├── tests/
+│   ├── autoload.php
+│   ├── bootstrap.php
+│   ├── config_repository.php
+│   ├── container.php
+│   ├── csrf_application.php
+│   ├── csrf_middleware.php
+│   ├── csrf_token_manager.php
+│   ├── database_config.php
+│   ├── database_connection.php
+│   ├── database_factory.php
+│   ├── environment.php
+│   ├── http_lifecycle.php
+│   ├── http_middleware.php
+│   ├── http_request_logging.php
+│   ├── http_security_headers.php
+│   ├── request_metadata.php
+│   ├── request_parsed_body.php
+│   ├── session.php
+│   ├── session_application.php
+│   ├── session_config.php
+│   ├── session_manager.php
+│   ├── session_middleware.php
+│   ├── setup_test_database.php
+│   └── trusted_proxy_resolver.php
+├── .env.example
+├── .gitignore
+├── composer.json
+└── README.md
+```
+
+**Observed absences at this checkpoint:** app/ and resources/ did not exist in the developer's local directory listing. config/app.php was also absent. The Composer App namespace PSR-4 mapping exists, but that mapping alone does not mean the app/ directory has been created. The local working tree contained uncommitted and untracked session/CSRF changes; the developer had not reported them as committed or pushed.
+
+### 4.1 Current template/view structure — locally observed
+
+The following View subsystem structure was reported from the developer's local working tree on 2026-11-07. It records local implementation and must not be read as proof that these source files have been committed or pushed to GitHub.
+
+```text
+framework/
+└── src/
+    └── View/
+        ├── View.php
+        ├── ViewFinder.php
+        ├── ViewRenderer.php
+        ├── HtmlEscaper.php
+        ├── ViewCompositionContext.php
+        ├── Compiler/
+        │   ├── Compiler.php
+        │   └── CompiledViewCache.php
+        └── Exceptions/
+            ├── ViewException.php
+            └── ViewNotFoundException.php
+
+resources/
+└── views/
+    └── partials/
+
+storage/
+└── framework/
+    └── views/
+```
+
+**Current responsibilities:**
+
+- `View`: application-facing rendering API.
+- `ViewFinder`: resolves templates inside approved view directories and rejects invalid names and traversal attempts.
+- `Compiler`: compiles the supported template directives and escaped interpolations into PHP; it is not a complete PHP parser.
+- `CompiledViewCache`: stores generated templates outside the public document root and manages compiled-cache identity.
+- `ViewRenderer`: executes compiled templates, captures output, and manages rendering failures.
+- `HtmlEscaper`: provides the default HTML-escaping behavior for interpolated values.
+- `ViewCompositionContext`: tracks state needed for layout/section composition.
+- `resources/views/`: application templates, including the partials directory.
+- `storage/framework/views/`: generated compiled templates; this runtime directory must not be publicly accessible.
+
+The structure above is a developer-reported local snapshot. Check the local working tree before assuming every listed item is present in the remote branch.
+
+## 5. Implemented Work — Verified Repository State
+
+This section records what exists in the repository as of the date above.
+
+### 5.1 Project and autoloading
+
+- [x] GitHub repository initialized.
+- [x] Initial project directory structure created.
+- [x] Composer project initialized.
+- [x] Composer PSR-4 autoload mappings configured.
+- [x] Composer autoload generation tested.
+
+Current `composer.json` namespace mappings:
+
+```json
+{
+  "autoload": {
+    "psr-4": {
+      "CivicPulse\\Framework\\": "framework/src/",
+      "App\\": "app/"
+    }
+  }
+}
+```
+
+This means classes under the `CivicPulse\\Framework\\` namespace are loaded from `framework/src/`, and application classes under `App\\` are loaded from `app/`.
+
+### 5.2 HTTP Request
+
+File: `framework/src/Http/Request.php`
+
+Implemented behavior:
+
+- [x] Stores and normalizes the HTTP method to uppercase.
+- [x] Extracts the URL path from a URI.
+- [x] Parses query-string parameters with PHP's `parse_str()`.
+- [x] Exposes all query parameters through `getQuery()`.
+- [x] Retrieves one query parameter with a default through `getQueryParam()`.- [x] Normalizes incoming header names to lowercase.
+- [x] Retrieves a header through `getHeader()`.
+- [x] Preserves the raw request body through `getBody()`.
+- [x] Provides `createFromGlobals()` to build a request from PHP's request environment.
+
+- [x] Normalizes the result of `getallheaders()` to an array when the function returns `false`.
+
+The Request implementation is integrated with the Router and Application lifecycle.
+
+### 5.3 Router
+
+File: `framework/src/Routing/Router.php`
+
+Implemented behavior:
+
+- [x] Uses an instance-owned route registry.
+- [x] Registers GET and POST routes.
+- [x] Supports direct route registration through `addRoute()`.
+- [x] Normalizes HTTP methods to uppercase during registration and lookup.
+- [x] Dispatches an incoming `Request` object.
+- [x] Passes the Request to the matched handler.
+- [x] Enforces a `Response` return contract for route handlers.
+- [x] Returns HTTP 404 when the path is unknown.
+- [x] Returns HTTP 405 when the path exists but the method is unsupported.
+- [x] Includes the supported methods in the 405 `Allow` header.
+- [x] Keeps routes isolated between Router/Application instances.
+
+**Architecture decision:** use an instance-based Router. Each Application receives its own Router, avoiding shared static route state and making isolated tests possible. Basic exact-path routing is intentionally implemented before dynamic route parameters or route groups.
+
+### 5.4 Existing test/check script
+
+File: `tests/autoload.php`
+
+Current check creates a Request and verifies query parameter retrieval for:
+
+- `page=5`
+- `status=pending`
+- a missing `category` with default `all`
+
+Command, run from the project root:
+
+```bash
+php tests/autoload.php
+```
+
+Expected output:
+
+```text
+string(1) "5"
+string(7) "pending"
+string(3) "all"
+```
+
+This is a small foundation check, not a full automated test suite.
+
+### 5.5 HTTP Response
+
+File: `framework/src/Http/Response.php`
+
+Implemented behavior:
+
+- [x] Stores response content, status code, and headers.
+- [x] Validates HTTP status codes and response header names/values.
+- [x] Exposes content, status, and headers for tests.
+- [x] Provides a JSON response helper with safe JSON encoding.
+- [x] Supports optional additional headers in the JSON helper.
+- [x] Sends the HTTP status, headers, and body through `send()`.
+
+### 5.6 Application lifecycle and public entry points
+
+Files:
+
+- `framework/src/Application/Application.php`
+- `public/index.php`
+- `public/router.php`
+- `routes/web.php`
+
+Implemented behavior:
+
+- [x] Application handles a supplied Request and returns a Response.
+- [x] Application runtime entry point creates a Request from PHP globals and sends the Response.
+- [x] Front controller loads Composer autoloading, registers routes, creates Application, and runs it.
+- [x] PHP development-server router forwards non-file paths to the front controller.
+- [x] GET `/` returns a CivicPulse JSON health/landing response.
+- [x] GET `/reports` returns an explicitly empty, not-yet-persisted reports response.
+
+### 5.8 Database foundation — initial implementation present remotely; hardening changes verified locally
+
+The initial database implementation files are present in the inspected `main` branch. The hardening changes and new test scripts described below were committed and pushed in `d49657c` (`Add multiple test cases for db connections`). The developer has confirmed that local `main` is synchronized with `origin/main` and the working tree is clean.
+
+- `framework/src/Database/Contracts/DatabaseDriverInterface.php`
+- `framework/src/Database/Drivers/MySqlDriver.php`
+- `framework/src/Database/Drivers/PostgreSqlDriver.php`
+- `framework/src/Database/Drivers/SQLiteDriver.php`
+- `framework/src/Database/Connection.php`
+- `framework/src/Database/ConnectionFactory.php`
+- `framework/src/Database/DatabaseConfig.php`
+- `framework/src/Database/DatabaseManager.php`
+- `config/database.php`
+- `tests/database_connection.php`
+
+Implemented locally:
+
+- [x] A common `DatabaseDriverInterface` contract.
+- [x] PDO connection implementations for MySQL/MariaDB, PostgreSQL, and SQLite.
+- [x] Dynamic driver selection through `ConnectionFactory`.
+- [x] Driver aliases for `mysql`, `mariadb`, `pgsql`, `postgres`, `postgresql`, and `sqlite`.
+- [x] A `Connection` wrapper for parameterized select, select-one, scalar, statement, inserted-ID retrieval, and transaction operations.
+- [x] Configuration validation through `DatabaseConfig`, including safe validation order, default connection existence, array connection definitions, and non-empty string driver names (local hardening change; tests passed).
+- [x] Named connection resolution and connection caching through `DatabaseManager`.
+- [x] Configuration-driven default connection settings in `config/database.php`.
+- [x] Transaction commit and rollback behavior verified against MariaDB.
+- [x] Nested transaction rejection verified; nested transactions remain intentionally unsupported.
+
+Developer environment and verification:
+
+- [x] PHP PDO is enabled.
+- [x] The `pdo_mysql` extension is available.
+- [x] PHP 8.5.12 permanently loads `pdo_pgsql` and `pdo_sqlite` alongside `pdo_mysql`; `PDO::getAvailableDrivers()` reports `mysql`, `pgsql`, and `sqlite`.
+- [x] SQLite runtime-tested through CivicPulse's `ConnectionFactory` and `Connection`: in-memory database creation, table creation, parameterized insert/select, scalar count, transaction commit, and rollback all passed.
+- [x] The MariaDB server responds with version `10.4.32-MariaDB`.
+- [x] All ten database PHP files passed `php -l`.
+- [x] `php tests/database_connection.php` passed against the real MariaDB server, including parameterized queries, connection caching, transaction commit, nested-transaction rejection, and rollback.
+- [x] `php tests/database_config.php` passed all eight configuration checks, including invalid and valid configurations.
+- [x] `php tests/database_factory.php` passed unsupported-driver handling, PostgreSQL alias/missing-extension checks, SQLite missing-extension handling, and real MySQL/MariaDB alias connections.
+- [x] `git diff --check` reported no whitespace errors for the local changes.
+- [x] Commit/push the verified local hardening and test scripts after final review (`d49657c`); local `main` is synchronized with `origin/main` and the working tree is clean.
+
+Local test files currently added or modified:
+- Modified: `framework/src/Database/DatabaseConfig.php`
+- Modified: `tests/database_connection.php`
+- Added: `tests/database_config.php`
+- Added: `tests/database_factory.php`
+- Added: `tests/setup_test_database.php` (local test utility that creates the `civicpulse_test` database; it uses local development credentials and must be reviewed before any commit).
+
+The connection integration test currently overrides the MySQL test connection to use the dedicated `civicpulse_test` database. The test database setup utility was run successfully. The developer's environment uses a local MariaDB account with username `root` and an empty password; do not assume those credentials are portable or suitable for shared/production environments.
+
+Important limitations and verification boundaries:
+
+- PostgreSQL 18.6 runtime integration is now verified locally through CivicPulse's `PostgreSqlDriver`, `ConnectionFactory`, `DatabaseManager`, and `Connection`. The developer installed PostgreSQL Server 18.6, enabled `pdo_pgsql`, created the dedicated `civicpulse_test` database, and passed connection, server-version, parameterized-query, connection-caching, temporary-table, transaction-commit, and transaction-rollback checks. This is local integration evidence, not production verification.
+- MariaDB is reached through PDO's `pdo_mysql` driver; it does not require a separate `pdo_mariadb` extension.
+- The current database configuration reads process environment variables with `getenv()`. A project environment-file loader has not yet been implemented.
+- The current connection layer is an initial foundation, not a complete cross-database SQL abstraction. SQL dialect differences, schema grammar, portability, nested transactions, reconnect behavior, and production connection policies remain future work.
+- The inspected GitHub `main` branch contains the listed database implementation files. Local uncommitted changes may still differ from the remote branch; verify with `git status --short` and local file inspection before continuing.
+
+**Definition of Done for the current local hardening pass:** configuration validation, driver factory behavior, MySQL/MariaDB aliases, parameterized queries, connection caching, transaction commit, rollback, and nested-transaction rejection have passed their respective local test scripts. SQLite runtime support has passed through CivicPulse's PDO connection layer. PostgreSQL 18.6 runtime integration has now also passed through the existing CivicPulse classes, including connection, parameterized query, connection caching, temporary-table creation, commit, and rollback. The hardening changes and test files are committed and present in the remote repository at `d49657c`; the PostgreSQL integration was performed with an inline local test and did not modify repository source files.
+
+### 5.8 PostgreSQL 18.6 runtime integration — locally verified
+
+**Status: Passed locally on 2026-11-05 using the existing framework implementation. No framework source files were changed for this verification.**
+
+Developer environment and setup:
+
+- [x] PostgreSQL Server 18.6 installed on Windows and Windows service `postgresql-x64-18` confirmed running.
+- [x] PostgreSQL command-line client verified at `C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe`; `psql --version` reported 18.6. The executable is not currently on Git Bash's PATH, so it was invoked by its full path.
+- [x] PHP's `pdo_pgsql` extension enabled; `PDO::getAvailableDrivers()` includes `pgsql`.
+- [x] Password authentication for the local `postgres` role repaired. A narrowly scoped temporary IPv4 localhost `trust` rule was used only to set a new password, then the backed-up original `pg_hba.conf` was restored and reloaded. A subsequent password-authenticated `psql` connection succeeded; the original SCRAM rules are in place.
+- [x] Dedicated database `civicpulse_test` created, owned by `postgres`, using UTF-8 encoding.
+
+**Actual CivicPulse integration test results:**
+
+The developer ran an inline PHP script from the project root using Composer autoloading and the existing `DatabaseConfig`, `DatabaseManager`, `ConnectionFactory`, `PostgreSqlDriver`, and `Connection` classes. Credentials were read from the temporary `CIVICPULSE_PGSQL_PASSWORD` environment variable and the variable was unset after the test.
+
+- [x] Connected driver reported `pgsql`.
+- [x] Server version query returned PostgreSQL 18.6 on x86_64 Windows.
+- [x] Named parameterized SELECT returned the expected message.
+- [x] `DatabaseManager` returned the same cached connection for default and named `pgsql` access.
+- [x] PostgreSQL temporary table created successfully using an identity primary key.
+- [x] Transaction commit persisted the expected row within the test session.
+- [x] An intentional exception caused transaction rollback; the committed row remained and the rolled-back row was absent.
+- [x] Test printed `All PostgreSQL integration tests passed.`
+- [x] Temporary password environment variable was unset after the test.
+
+**Scope and limitations:**
+
+- This verifies local PostgreSQL connection and core operations through the existing CivicPulse classes. It does not establish production readiness, cross-platform support, schema-builder portability, migration behavior, or full PostgreSQL feature compatibility.
+- The test table was temporary and session-scoped; no permanent application table or framework source file was created.
+- The existing `tests/database_connection.php` remains MySQL/MariaDB-specific (for example, it uses `SELECT VERSION()` and `AUTO_INCREMENT`). PostgreSQL was therefore tested with a separate inline script rather than changing the existing shared test.
+- PostgreSQL is locally integration-tested; it is not yet production-verified. No new committed PostgreSQL test script has been added.
+
+### 5.9 Environment loading, configuration repository, service container, and bootstrap integration
+
+**Status: Implemented, fully verified locally, committed, and pushed to GitHub `main` on 2026-11-06.** The implementation is included in commit `e1487fe` (`feat: add dependency injection container and application bootstrap`).
+
+**Environment and configuration services**
+
+Files:
+- `framework/src/Configuration/Environment.php`
+- `framework/src/Configuration/ConfigRepository.php`
+- `tests/environment.php`
+- `tests/config_repository.php`
+
+Verified behavior:
+- [x] Environment loader reads simple key/value entries, quoted values, blank lines, comments, and supported double-quoted escapes.
+- [x] Existing process environment values are preserved.
+- [x] Missing optional files are allowed; missing required files and malformed entries are rejected.
+- [x] Environment variable interpolation and shell execution are not performed.
+- [x] Configuration repository loads trusted PHP configuration files from the configured directory.
+- [x] Dotted-key access, defaults, key-existence checks, full configuration retrieval, and preservation of original value types/null values work.
+- [x] Missing configuration directories and configuration files that do not return arrays are rejected.- [x] `php tests/environment.php` passed all 12 checks.
+- [x] `php tests/config_repository.php` passed all 12 checks.
+
+**Dependency injection container**
+
+Files:
+- `framework/src/Container/Container.php`
+- `framework/src/Container/ContainerException.php`
+- `tests/container.php`
+
+Verified behavior:
+- [x] Transient bindings, singleton bindings, prebuilt instances, interface-to-concrete bindings, and closure factories.
+- [x] Automatic constructor dependency resolution, including nested dependencies and constructor defaults.
+- [x] Clear rejection of unresolved scalar, union, and intersection dependencies.
+- [x] Circular dependency and circular alias detection with resolution-chain diagnostics.
+- [x] Failed resolution cleanup, singleton factory caching, rebinding behavior, nullable class dependencies, and invalid factory-result rejection.
+- [x] Unbound interfaces, abstract classes, missing classes, and empty service identifiers are rejected.
+- [x] `php tests/container.php` passed all 26 checks.
+
+**Application bootstrap integration**
+
+Files:
+- `bootstrap/app.php`
+- `public/index.php`
+- `tests/bootstrap.php`
+
+Verified behavior:
+- [x] Bootstrap loads the environment file before trusted PHP configuration.
+- [x] Bootstrap registers the configuration repository as a shared instance.
+- [x] DatabaseConfig, ConnectionFactory, DatabaseManager, and Router are registered as singletons.
+- [x] Application is automatically constructed through dependency injection.
+- [x] The front controller resolves the shared Router and Application from the container before dispatching the HTTP request.
+- [x] `php tests/bootstrap.php` passed all 17 checks, including shared-instance and singleton behavior.
+- [x] Real HTTP requests through the PHP development server returned the expected results: GET `/` = 200, GET `/reports` = 200, GET `/unknown` = 404, and POST `/reports` = 405 with `Allow: GET`.
+- [x] The HTTP test confirms the existing reports response remains a placeholder; persistence is not connected.
+
+**Full local verification reported on 2026-11-06**
+
+The developer ran the following scripts successfully:
+- [x] `php tests/environment.php` — 12 checks.
+- [x] `php tests/config_repository.php` — 12 checks.
+- [x] `php tests/container.php` — 26 checks.
+- [x] `php tests/bootstrap.php` — 17 checks.
+- [x] `php tests/http_lifecycle.php` — 8 checks.
+- [x] `php tests/database_config.php` — 8 checks.
+- [x] `php tests/database_factory.php` — all applicable checks passed; PostgreSQL and SQLite extension-absence checks were skipped because both extensions are installed; MySQL and MariaDB aliases passed.
+- [x] `php tests/database_connection.php` — MariaDB 10.4.32 connection, parameterized query, connection caching, transaction commit, nested-transaction rejection, and rollback all passed.
+- [x] Live HTTP smoke tests — all four route/method cases returned the expected status and response.
+- [x] `git diff --check` — no whitespace errors.
+
+**Commit and synchronization status**
+
+- [x] The developer committed the verified local changes and rebased the two local commits onto the updated remote `main` history.
+- [x] The final pushed commit is `e1487fe` (`feat: add dependency injection container and application bootstrap`).
+- [x] The developer ran `git fetch origin` and confirmed `main` and `origin/main` both point to `e1487fe`.
+- [x] `git status -sb` returned `## main...origin/main`, confirming the local branch is synchronized and the working tree is clean.
+- [x] The remote `context.md` update from `0928f10` is included in the history before the application-container commit.
+- [x] No force-push or destructive reset was used.
+
+### 5.10 HTTP middleware contract and pipeline
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Commit: `24e9696` (`feat: add HTTP middleware pipeline`).
+
+**Files added:**
+- `framework/src/Http/Contracts/RequestHandlerInterface.php`
+- `framework/src/Http/Middleware/MiddlewareInterface.php`
+- `framework/src/Http/Middleware/MiddlewareRequestHandler.php`
+- `framework/src/Http/Middleware/MiddlewarePipeline.php`
+- `tests/http_middleware.php`
+
+**Files modified:**
+- `framework/src/Application/Application.php`
+- `framework/src/Routing/Router.php`
+
+**Architecture and behavior:**
+- [x] Added a request-handler contract with `handle(Request): Response`.
+- [x] Added a middleware contract with `process(Request, RequestHandlerInterface): Response`.
+- [x] Added a handler adapter that wraps each middleware and delegates to the next handler.
+- [x] Added a pipeline that wraps the destination in reverse registration order, producing execution in registration order and response unwinding in reverse order.
+- [x] Added per-Application middleware registration through `addMiddleware()`.
+- [x] Made Router implement `RequestHandlerInterface`; its `handle()` delegates to the existing `dispatch()`, preserving the router's existing API and behavior.
+- [x] Preserved the `Application(Router $router)` constructor signature, keeping existing container-based construction compatible.
+- [x] Middleware may return a response without invoking the next handler, allowing short-circuit behavior.
+- [x] Applications with no registered middleware continue to work.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Syntax checks passed for all seven changed/added PHP files.
+- [x] `php tests/http_middleware.php` passed all six assertions: route reaches HTTP 200, original Request is forwarded, registration/response order is correct, middleware can short-circuit with HTTP 401, short-circuit prevents route execution, and an application without middleware still works.
+- [x] `php tests/http_lifecycle.php` passed all eight existing HTTP lifecycle assertions.
+- [x] `php tests/bootstrap.php` passed all 17 application bootstrap assertions, including automatic Application construction through dependency injection.
+- [x] `git diff --check` and `git diff --cached --check` reported no whitespace errors.
+- [x] Seven intended files were staged and reviewed; commit `24e9696` was created successfully.
+- [x] `git push origin main` succeeded, advancing remote `main` from `0824a02` to `24e9696`.
+
+**Scope and limitations:**
+- This milestone covers the initial middleware contract and pipeline only. Request IDs and structured HTTP request logging were added in the subsequent milestone documented in section 5.11. Security-header middleware, trusted-proxy policy, session service, authentication, and authorization middleware are not yet implemented.
+- Middleware is registered on each Application instance. Global middleware groups, route-specific middleware, middleware aliases/priorities, and configurable middleware resolution are not implemented.
+- The test script is a standalone PHP test; no PHPUnit dependency or general test runner has been introduced.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** the middleware contract, registration, execution order, response unwinding, short-circuit behavior, no-middleware compatibility, existing HTTP lifecycle regression tests, and container bootstrap regression tests all passed locally. The implementation is committed and pushed as `24e9696`.
+
+### 5.11 HTTP request IDs and structured request logging
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `654cbd7` (`feat: add HTTP request IDs and request logging`).
+
+**Files added:**
+- `framework/src/Http/Middleware/RequestIdMiddleware.php`
+- `framework/src/Http/Middleware/RequestLoggingMiddleware.php`
+- `framework/src/Logging/LoggerInterface.php`
+- `framework/src/Logging/ErrorLogLogger.php`
+- `tests/http_request_logging.php`
+
+**Files modified:**
+- `framework/src/Http/Request.php`
+- `framework/src/Http/Response.php`
+- `bootstrap/app.php`
+- `public/index.php`
+- `tests/bootstrap.php`
+
+**Architecture and behavior:**
+- [x] Added request attributes to `Request` so middleware and downstream handlers can share request-scoped metadata.
+- [x] Added immutable `Response::withHeader()`, replacing an existing header case-insensitively and validating the resulting response through the constructor.
+- [x] Added `RequestIdMiddleware`, which generates a cryptographically secure 128-bit random request ID and stores its 32-character lowercase hexadecimal representation on the Request.
+- [x] Added the `X-Request-ID` response header so clients can correlate a response with server-side logs.
+- [x] Added `LoggerInterface` with a structured level/message/context contract and an `ErrorLogLogger` implementation that writes JSON records through PHP's `error_log()`.
+- [x] Registered the logger as a singleton in the application service container.
+- [x] Registered request-ID middleware before request-logging middleware in the front controller, ensuring the ID is available to log records and is attached to the final response.
+- [x] Logged successful requests at `info` level with request ID, method, path (without query string), response status, and elapsed duration in milliseconds.
+- [x] Logged failed requests at `error` level with request ID, method, path, duration, and exception class. Exception messages are deliberately excluded from the structured context.
+- [x] Made logging best-effort: a logger failure does not interrupt a successful HTTP response and does not replace the original application exception.
+- [x] Preserved exception propagation; the middleware logs and rethrows rather than converting application exceptions into responses.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Syntax checks passed for the ten changed/added PHP files.
+- [x] `php tests/http_request_logging.php` passed all 19 assertions, covering generated and distinct request IDs, response/request ID consistency, structured success and failure records, query-string exclusion, status and duration fields, exception propagation, omission of exception messages, and logging-failure isolation for both successful and failed requests.
+- [x] `php tests/http_middleware.php` passed all six middleware pipeline assertions.
+- [x] `php tests/http_lifecycle.php` passed all eight HTTP lifecycle assertions.
+- [x] `php tests/bootstrap.php` passed all 19 bootstrap assertions, including logger interface resolution and singleton behavior.
+- [x] `git diff --check` and `git diff --cached --check` passed without whitespace errors.
+- [x] Exactly ten intended files were staged and reviewed; the source commit was created as `654cbd7`.
+- [x] `git push origin main` succeeded, advancing remote `main` from `396b827` to `654cbd7`.
+- [x] The developer verified `git status -sb` as `## main...origin/main` and `git log -1 --oneline` as `654cbd7`, confirming the local branch is synchronized and the working tree is clean.
+
+**Scope and limitations:**
+- The current logger writes JSON to PHP's configured error log. File rotation, remote log shipping, retention policy, log levels/configuration, and production observability integration are not implemented.
+- The request ID is generated by the application for each request; accepting and validating externally supplied correlation IDs is not implemented.
+- Security headers, trusted-proxy handling, sessions, authentication, and authorization middleware remain future work.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** request-scoped ID generation, response header propagation, structured success/failure logging, logging-failure isolation, middleware ordering, container registration, and regression compatibility all passed the reported local tests. Source is committed and pushed as `654cbd7`.
+
+### 5.12 Configurable HTTP security headers
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `9daac38` (`Add configurable HTTP security headers`).
+
+**Files added:**
+- `config/security.php`
+- `framework/src/Http/Middleware/SecurityHeadersMiddleware.php`
+- `tests/http_security_headers.php`
+
+**Files modified:**
+- `public/index.php`
+
+**Architecture and behavior:**
+- [x] Added centralized `security.headers` configuration, loaded through the existing `ConfigRepository` without adding a separate configuration-loading path.
+- [x] Added `SecurityHeadersMiddleware`, which delegates to the next handler, validates the configured header map and string names/values, then adds headers to the returned immutable Response using `Response::withHeader()`.
+- [x] Configured `X-Content-Type-Options: nosniff`.
+- [x] Configured `X-Frame-Options: DENY`.
+- [x] Configured `Referrer-Policy: strict-origin-when-cross-origin`.
+- [x] Configured `Permissions-Policy: camera=(), microphone=(), geolocation=(self)`; same-origin geolocation is allowed for potential CivicPulse location-reporting functionality.
+- [x] Registered middleware after request-ID and request-logging middleware in the front controller. It decorates normal and short-circuit responses before request logging observes the completed response.
+- [x] Existing response headers are preserved unless a configured header replaces the same header case-insensitively.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] PHP syntax checks passed for `config/security.php`, `framework/src/Http/Middleware/SecurityHeadersMiddleware.php`, `tests/http_security_headers.php`, and `public/index.php`.
+- [x] `php tests/http_security_headers.php` passed all 11 assertions, covering all four configured headers, preservation of existing/unrelated headers, case-insensitive replacement without duplicates, short-circuit response status/header behavior, and rejection of invalid configuration.
+- [x] Regression tests passed: `php tests/http_middleware.php` (6 assertions), `php tests/http_request_logging.php` (19 assertions), `php tests/http_lifecycle.php` (8 assertions), and `php tests/bootstrap.php` (19 assertions).
+- [x] Real HTTP checks using the PHP development server and `curl -i` verified `GET /` (200), `GET /reports` (200), an unknown route (404), and `POST /reports` (405 with `Allow: GET`). All four responses included the four configured security headers and a distinct `X-Request-ID`.
+- [x] `git diff --check` and staged diff checks passed without whitespace errors.
+- [x] Four intended files were reviewed, committed as `9daac38`, and pushed successfully; the developer verified `git status -sb` as `## main...origin/main` and `git log -1 --oneline` as `9daac38`, confirming a clean working tree synchronized with `origin/main`.
+
+**Scope and limitations:**
+- This milestone implements the four configured browser security headers only. Content Security Policy (CSP), HSTS, and other deployment-specific headers are not configured.
+- Trusted-proxy handling is not implemented. Forwarded client IP, host, and scheme headers must not be trusted until explicit proxy trust configuration and address/chain validation are designed and tested.
+- The middleware decorates responses returned through the normal application pipeline, including tested 404 and 405 responses. The request-logging middleware still rethrows unhandled application exceptions; centralized exception-to-response handling is not yet implemented, so do not claim that this middleware guarantees headers on unhandled exception responses.
+- No production HTTPS or reverse-proxy deployment verification has been performed.
+- This milestone does not connect CivicPulse reports to database persistence.
+
+**Definition of Done:** all 11 dedicated security-header assertions, the 52 regression assertions across the four existing suites, PHP syntax checks, whitespace checks, and four real HTTP response checks passed as reported by the developer. Source commit `9daac38` is pushed to `origin/main` and the working tree is clean.
+
+### 5.13 Trusted-proxy handling and request network metadata
+
+**Status: Implemented, locally tested, committed, and pushed to GitHub `main` on 2026-11-06.** Source commit: `2087a7c` (`Add trusted proxy support`).
+
+**Files added:**
+- `config/trusted_proxies.php`
+- `framework/src/Http/TrustedProxyResolver.php`
+- `tests/request_metadata.php`
+- `tests/trusted_proxy_resolver.php`
+
+**Files modified:**
+- `framework/src/Http/Request.php`
+- `framework/src/Application/Application.php`
+- `tests/bootstrap.php`
+
+**Architecture and behavior:**
+- [x] Added explicit trusted proxy IP/CIDR configuration. The default proxy list is empty, so forwarded metadata is not trusted by default.
+- [x] Added IPv4 and IPv6 exact-address and CIDR matching, including partial-byte network prefixes.
+- [x] Added a dedicated `TrustedProxyResolver` to validate trust and resolve client IP and scheme metadata.
+- [x] Resolve `X-Forwarded-For` only when the immediate connecting peer (`REMOTE_ADDR`) is configured as trusted. Walk the validated chain from right to left, skip trusted proxy hops, and select the first untrusted address. Limit the chain to 20 addresses; malformed chains fall back to the immediate remote address.
+- [x] Accept `X-Forwarded-Proto` only from a trusted immediate proxy and only when it contains one supported `http` or `https` value. Otherwise retain the direct connection scheme.
+- [x] Keep forwarded-host trust disabled by default. When explicitly enabled, accept a validated `X-Forwarded-Host` only from a trusted immediate proxy.
+- [x] Add host syntax validation for direct and forwarded host values, including domain, IPv4, bracketed IPv6, and valid optional port forms. Syntax validation is not a host authorization policy.
+- [x] Expose resolved request metadata through `Request::getClientIp()`, `getScheme()`, `getHost()`, and `isSecure()`.
+- [x] Integrate the resolver into `Request::createFromGlobals()` and Application's container-based construction while preserving the existing `Application(Router)` usage.
+- [x] Harden handling of duplicate security-sensitive forwarded headers: conflicting separately exposed duplicate values are discarded; identical duplicates and valid comma-separated XFF chains are handled deliberately. Ordinary header duplicate behavior remains unchanged.
+
+**Local verification reported by the developer on 2026-11-06:**
+- [x] Eight regression scripts passed: `tests/bootstrap.php`, `tests/container.php`, `tests/trusted_proxy_resolver.php`, `tests/request_metadata.php`, `tests/http_lifecycle.php`, `tests/http_middleware.php`, `tests/http_request_logging.php`, and `tests/http_security_headers.php`.
+- [x] Seven PHP syntax checks passed for `Application.php`, `Request.php`, `TrustedProxyResolver.php`, `config/trusted_proxies.php`, and the three affected/new test files.
+- [x] `git diff --check` reported no whitespace errors.
+- [x] Real HTTP checks using the PHP development server confirmed that spoofed forwarded headers are ignored when no proxy is trusted. With loopback explicitly trusted for the test and forwarded-host trust enabled, the request resolved the supplied test client IP, HTTPS scheme, and forwarded host as expected. The temporary test configuration and route were removed/restored afterward.
+- [x] The developer reviewed and committed the nine-file source change, including replacement of `folder-boilerplate-1.3.1.vsix` with `folder-boilerplate-1.5.0.vsix`.
+- [x] The final source commit was rebased onto the remote deletion commit without force-pushing, then pushed successfully: `2087a7c` (`Add trusted proxy support`). The push advanced remote `main` from `5543634` to `2087a7c`.
+
+**Scope and limitations:**
+- The standardized `Forwarded` header is not supported in this first implementation; the resolver handles the `X-Forwarded-For` and `X-Forwarded-Proto` headers, and optionally `X-Forwarded-Host`.
+- Forwarded-host trust remains opt-in. Host syntax validation does not replace a future application-level host allowlist.
+- If a web server combines duplicate header lines into one value before PHP exposes them, the application cannot recover the original header-line boundaries. The duplicate-header checks cover conflicting duplicate entries PHP exposes separately; XFP and XFH values containing comma-separated ambiguity are rejected by their validators.
+- The implementation has passed local unit/integration and real HTTP checks, but has not been verified in a production reverse-proxy or load-balancer deployment.
+- This milestone does not implement report persistence, sessions, authentication, or authorization.
+
+**Definition of Done:** trusted-proxy configuration, IPv4/IPv6/CIDR matching, forwarded client-IP and scheme resolution, opt-in forwarded-host handling, request metadata accessors, container integration, duplicate forwarded-header hardening, all eight regression scripts, seven syntax checks, and the reported real HTTP checks passed locally. Source commit `2087a7c` is pushed to `origin/main`.
+
+### 5.7 Documentation
+
+- [x] `README.md` created and committed.
+- [x] Keep this `context.md` updated as the living development handoff and progress tracker.
+
+---
+
+## 6. Completed Milestone: Browser HTTP Request-to-Response Lifecycle
+
+**Status: Implemented and locally verified on 2026-11-05.**
+
+The first browser-facing HTTP lifecycle is working:
+
+```text
+Browser
+  |
+  v
+public/index.php
+  |
+  v
+Application
+  |
+  v
+Router
+  |
+  v
+Route handler
+  |
+  v
+Response
+  |
+  v
+Browser
+```
+
+### Implemented files
+
+- `framework/src/Http/Response.php`
+- `framework/src/Routing/Router.php`
+- `framework/src/Application/Application.php`
+- `routes/web.php`
+- `public/index.php`
+- `public/router.php`
+- `tests/http_lifecycle.php`
+
+### Local verification reported by the developer
+
+- [x] `git status --short` returned no output before these checks, indicating a clean working tree at that point.- [x] PHP syntax checks passed for all seven implementation/test files.
+- [x] `php tests/http_lifecycle.php` passed all eight assertions.
+- [x] PHP development server started with `php -S localhost:8000 -t public public/router.php`.
+- [x] `GET /` returned HTTP 200 and the CivicPulse JSON response.
+- [x] `GET /reports` returned HTTP 200 and an empty reports payload explicitly stating persistence is not connected.
+- [x] `GET /unknown` returned HTTP 404.
+- [x] `POST /reports` returned HTTP 405 with `Allow: GET`.
+- [x] Separate Application instances were verified to have isolated route registries by the integration test.
+
+Commands used:
+
+```bash
+php -l framework/src/Http/Response.php
+php -l framework/src/Routing/Router.php
+php -l framework/src/Application/Application.php
+php -l routes/web.php
+php -l public/index.php
+php -l public/router.php
+php -l tests/http_lifecycle.php
+
+php tests/http_lifecycle.php
+
+php -S localhost:8000 -t public public/router.php
+```
+
+### Known scope and limitations
+
+- Routing currently supports exact paths only; dynamic parameters, route groups, and named routes are not implemented.
+- The reports endpoint is a placeholder. There is no database connection or persistence yet.
+- The observed JSON content-type and Allow headers were emitted without a space after the colon by PHP's `header()` call. The responses were accepted by the local client; header formatting can be tidied separately without changing the lifecycle design.
+- The built-in PHP server is for local development, not production deployment.
+
+**Definition of Done:** the browser lifecycle milestone is complete based on the syntax checks, eight passing integration assertions, and the reported real HTTP responses above.
+
+---
+
+## 7. Expanded Framework and CivicPulse Roadmap
+
+These are planned capabilities, not claims of implementation. Build each subsystem behind a clear contract, then verify a complete working path before checking it off. Avoid building every possible adapter before CivicPulse needs it.
+
+### Milestone 2 — Application foundation and configuration
+
+- [x] Dependency injection / service container — implemented and locally tested; see section 5.9.
+- [x] Application configuration and configuration access — implemented and locally tested; see section 5.9.
+- [x] Environment-file loader, safe secret handling, and environment validation — initial loader implemented and tested; production secret-management policy remains future work.
+- [ ] Centralized exception handling and error responses.
+- [ ] A consistent automated test structure.
+
+### Milestone 3 — Middleware and HTTP request pipeline
+
+- [x] Middleware contract and pipeline/dispatcher — implemented through `RequestHandlerInterface`, `MiddlewareInterface`, `MiddlewareRequestHandler`, and `MiddlewarePipeline`; see section 5.10.
+- [x] Middleware registration and ordering — `Application::addMiddleware()` registers middleware per application; execution follows registration order and response processing unwinds in reverse order. Short-circuit responses are supported and tested; see section 5.10.
+- [x] Request logging and correlation/request IDs — generated request IDs, response header propagation, structured success/failure logging, and logging-failure isolation implemented and tested; see section 5.11.
+- [x] Configurable HTTP security headers — implemented and tested; see section 5.12.
+- [x] Trusted-proxy handling with explicit proxy trust configuration and forwarded-header validation; implemented and tested locally, including real HTTP checks. See section 5.13.
+- [x] Native PHP session abstraction, environment-driven session configuration, session manager, and session middleware — implemented and locally tested; application integration and persistence across requests verified in section 5.14. Changes remain local and have not been reported as committed or pushed.
+- [ ] Authentication and authorization middleware when those features are introduced.
+
+### Milestone 4 — Extensible database and storage foundation
+
+**Initial local implementation:** PDO MySQL/MariaDB, PostgreSQL, and SQLite drivers, common driver contract, connection factory, configuration, manager, connection wrapper. MariaDB connection and basic operations have passed local tests. See section 5.8.
+
+Relational database adapters to support over time:
+
+- [x] MySQL/MariaDB PDO driver implementation (MariaDB runtime-tested).
+- [x] PostgreSQL PDO runtime verification — PostgreSQL 18.6 locally integration-tested; see section 5.8.
+- [x] SQLite PDO runtime verification: in-memory connection and representative query/transaction operations passed locally.
+- [ ] SQL Server PDO adapter, subject to `pdo_sqlsrv` availability.
+- [ ] Oracle PDO adapter, subject to `pdo_oci` availability.
+- [ ] Firebird PDO adapter, subject to `pdo_firebird` availability.
+- [ ] IBM Db2 adapter, subject to the supported PDO/ODBC extension and client libraries.
+- [ ] Generic PDO_ODBC adapter for supported ODBC data sources, with explicit DSN and capability limitations.
+- [ ] Evaluate Sybase/FreeTDS (`pdo_dblib`) only if a real deployment or integration requires it.
+- [ ] Driver capability detection, extension checks, clear missing-extension errors, and platform compatibility checks.
+- [ ] A documented support matrix recording each adapter's status: planned, implemented, syntax-checked, integration-tested, or production-verified.
+- [ ] Additional adapters only where a real use case justifies them; do not claim universal support for every database engine.
+
+Database capabilities:
+
+- [ ] Driver registry/factory design that can add adapters without a growing, fragile conditional block.
+- [ ] Consistent configuration schema and connection options with driver-specific validation.
+- [ ] Explicit driver capability metadata (transactions, savepoints, returning/insert IDs, JSON, schemas, SSL, and other engine-specific features).
+- [ ] Multiple named connections and lifecycle management hardening.
+- [ ] Connection health checks, reconnect policy, timeouts, and safe failure handling.
+- [ ] Read/write connection separation and read-replica routing.
+- [ ] Parameter binding rules and portable query operations.
+- [ ] Database-specific SQL grammars for query building and schema operations.
+- [ ] Query builder based on CivicPulse report/user workflows.
+- [ ] Transaction behavior, including an explicit strategy for nested transactions/savepoints.
+- [ ] Database integration tests for each available engine.
+
+**Portability rule:** a shared connection contract does not make every SQL statement portable. Engine-specific syntax and capabilities must be isolated in driver/grammar adapters. PDO-based SQL databases and non-SQL stores must not be forced into one misleading interface.
+
+### Milestone 5 — Non-relational data stores, cache, and queues
+
+**Key-value/cache drivers:**
+
+- [ ] Define a cache contract around get, set, delete, has, TTL/expiration, and clear operations where appropriate.
+- [ ] In-memory adapter for tests and local development.
+- [ ] Redis adapter for production cache, counters, distributed locks, rate-limit state, and queue backend use.
+- [ ] Memcached adapter if a real deployment requires it.
+- [ ] Optional database-backed cache adapter.
+- [ ] Cache prefixing, serialization rules, atomic operations, TTL behavior, and cache-stampede protection where needed.
+
+**Other data-store drivers:**
+
+- [ ] MongoDB/document-store adapter behind a separate document-database contract if product requirements justify it.
+- [ ] Evaluate other document, search, or wide-column stores only against a concrete product requirement; do not force them into the SQL connection interface.
+
+**Sessions and queues:**
+
+- [ ] Session store contract and file, database, and Redis adapters where appropriate.
+- [ ] Queue contract covering dispatch, reservation, acknowledgement, retry, delay, failure, and dead-letter behavior.
+- [ ] In-memory/synchronous queue for tests and development.
+- [ ] Redis-backed queue adapter; consider database-backed queues when useful.
+- [ ] Cache invalidation, TTL, serialization, atomicity, concurrency, and failure behavior tests.
+
+Redis is not a relational database driver. It is a key-value store. Reuse a Redis connection/client adapter where sensible, but expose separate cache, lock, session, rate-limit, and queue contracts because their semantics and reliability requirements differ.
+
+### Milestone 6 — Schema builder, migrations, models, and CivicPulse persistence
+
+**Schema definition and fluent column API**
+
+- [ ] Design a fluent schema/blueprint API for defining tables and columns in migrations.
+- [ ] Support column types appropriate to supported engines: string/char/text, integer/big integer, boolean, decimal/float, date/time/timestamp, JSON, UUID, binary, and engine-specific types where needed.
+- [ ] Support chainable column constraints/modifiers such as nullable, default, unsigned where supported, unique, index, primary key, auto-increment/identity, length/precision/scale, comment, and foreign-key references.
+- [ ] Support table operations: create, alter, rename, drop, indexes, composite indexes, unique constraints, foreign keys, and constraint removal.
+- [ ] Provide explicit fluent APIs with predictable semantics, for example: `$table->string('title', 180)->nullable()->unique()`, `$table->foreignId('user_id')->constrained('users')`, and `$table->timestamps()`.
+- [ ] Keep schema definitions separate from model classes: migrations/schema builders describe storage; models describe application data and behavior. Do not make a model itself ambiguously act as a table blueprint.
+- [ ] Compile schema operations through per-engine grammar/adapters. Detect unsupported features and fail clearly rather than silently emitting incorrect SQL.
+- [ ] Test generated SQL and actual schema behavior separately for each supported relational engine.
+
+**Migration system**
+
+- [ ] Migration base contract/class and timestamped migration files with `up()` and `down()`.
+- [ ] Migration repository/table that records applied migration identifiers, batches, and execution order.
+- [ ] Commands for status, migrate, rollback, reset, refresh, and fresh rebuild, with destructive operations clearly confirmed/guarded.
+- [ ] Batch-aware rollback, targeted steps, transactions where the database supports transactional DDL, and documented behavior where it does not.
+- [ ] Concurrency protection so two deploy processes cannot apply the same migration simultaneously.
+- [ ] Migration discovery, deterministic ordering, failure reporting, and recovery guidance.
+- [ ] Database-specific schema grammars and integration tests for supported engines.
+
+**Models and data mapping**
+
+- [ ] A base Model with explicit table/primary-key configuration, attributes, safe hydration, inserts, updates, deletes, refresh, and serialization.
+- [ ] Query API for common filtering, ordering, limits, pagination, aggregates, and parameterized conditions.
+- [ ] Mass-assignment allowlists/guarding, attribute casts, timestamps, hidden/visible fields, and predictable null handling.
+- [ ] Relationships needed by CivicPulse: belongs-to, has-one, has-many, and many-to-many, with explicit foreign/local keys.
+- [ ] Eager loading and protection against accidental N+1 query patterns.
+- [ ] Query scopes, model lifecycle events/hooks, soft deletes where justified, and optimistic/concurrency controls where needed.
+- [ ] Model factories for repeatable test data, separate from production seeders.
+- [ ] Avoid implementing a large ORM surface before the initial CivicPulse reporting workflow proves which features are needed.
+
+**Seeders and test data**
+
+- [ ] Seeder contract/base class and deterministic seeder runner.
+- [ ] Seeder ordering/dependencies and idempotency strategy.
+- [ ] Development seeders for report categories, sample users/roles, and representative civic reports.
+- [ ] Separate safe production/reference-data seeding from destructive demo/test data.
+- [ ] Model factories and database reset helpers for isolated tests.
+- [ ] Database-backed integration tests for migrations, models, relationships, seeders, rollback, and constraints.
+
+**Initial CivicPulse schema:** users, roles/permissions as required, report categories, reports, normalized location data where appropriate, report evidence metadata, report status history, assignments, and audit events. Finalize fields and constraints from actual reporting workflows rather than guessing a generic schema.
+
+### Milestone 7 — First complete CivicPulse reporting workflow
+
+Build a real end-to-end vertical slice:
+
+- [ ] Define report data model and lifecycle.
+- [ ] Validate a submitted report.
+- [ ] Store a report and its location.
+- [ ] Expose report details and a report listing.
+- [ ] Handle expected errors and invalid input.
+- [ ] Test the workflow against a real test database.
+
+### Milestone 8 — Console / CLI tools
+
+- [ ] Console kernel and command registry.
+- [ ] Command signature, arguments, options, and help output.
+- [ ] Clear exit codes and formatted console output.
+- [ ] Commands for migrations, seeders, cache operations, and application diagnostics.
+- [ ] Scheduled-task integration only when a concrete operational need exists.
+
+The CLI is a framework subsystem, not a database driver. It should invoke framework services through the same application/container architecture.
+
+### Milestone 9 — Security, sessions, and form protection
+
+- [ ] Secure session abstraction and configurable session storage.
+- [ ] CSRF token generation, storage, validation, and rotation policy.
+- [ ] CSRF middleware for state-changing requests.
+- [ ] Safe template directive such as `@csrf` that renders a hidden CSRF token input.
+- [ ] Output escaping by default in the view/template system.
+- [ ] Password hashing, authentication, authorization, and policies.
+- [ ] Input validation, upload validation, and security-focused tests.
+
+The `@csrf` syntax depends on a template compiler/view engine. It is not PHP syntax and must not be treated as a magic annotation. The directive should generate a real hidden form field, while middleware validates the submitted token. Template directives must compile to explicit, testable behavior; they must not bypass escaping, authorization, or request validation.
+
+**Planned template syntax / developer shortcuts (Laravel-inspired in ergonomics, independently designed and implemented):**
+
+- [ ] `@csrf` — render the hidden CSRF token field, backed by the CSRF token manager and middleware.
+- [ ] `@method('PUT')` — render a validated method-override field for supported form methods.
+- [ ] `@if`, `@elseif`, `@else`, `@endif` — conditional rendering.
+- [ ] `@foreach`, `@forelse`, `@empty`, `@endforeach` — safe collection iteration and empty states.
+- [ ] `@include`, `@extends`, `@section`, `@yield`, `@endsection` — reusable layouts and partials, with explicit data passing, predictable scope, nested composition, and safe path resolution.
+- [x] `@components('name', [...])` — implemented reusable component-template invocation with a static quoted component name, optional explicit props array, default and named slots, nested components, isolated props, and escaped interpolation. See section 5.18 for the verified contract.
+- [ ] `@call("include.php/style.css/main.js")` — component/partial-scoped resource loading and registration. When declared at the top of a partial or component template, it can request approved HTML partials, CSS assets, and JavaScript assets for the current component. Define typed resource handling, where and when each asset is emitted, dependency ordering, deduplication, and component scope. The intended priority/override behavior is that an explicitly overriding resource registered for the current component can take precedence over an already registered resource; this must be a controlled registry-level override with deterministic precedence, not an unrestricted filesystem overwrite or arbitrary code execution. Finalize the exact syntax and override rules before implementation.
+- [ ] `@build(html)` — a special rendering/build directive for content whose source may be text stored in the database. Its purpose is to transform supported text-form HTML into renderable output instead of always displaying markup characters literally. This is a security-sensitive trust boundary: database content is untrusted by default. Define an allowlisted HTML subset and sanitizer/validator, preserve context-appropriate escaping, and reject or neutralize unsafe tags, attributes, URLs, embedded event handlers, and script execution. CSS and JavaScript must not become executable merely because they came from the database; any supported CSS/JS build path requires separate explicit policy, validation, and asset handling. Never implement `@build` as raw `eval()`, arbitrary PHP execution, or a blanket escaping bypass.
+- [ ] Keep `@build`, `@call`, and `@components` distinct because they represent different intended responsibilities: safe transformation/rendering of stored markup; loading/registering component resources with controlled precedence; and reusable parameterized component templates. Refine the public grammar and contracts before implementation, including malformed syntax behavior, nested use, caching, scope, and path safety. All component and asset paths must be constrained to approved view/resource roots; no arbitrary file inclusion or user-controlled path execution.
+- [ ] `@auth`, `@guest`, and role/permission directives only after authentication and authorization services exist.
+- [ ] `@error` and validation-error helpers after the validation and form-error contracts exist.
+- [ ] Escaped output by default, with an explicit and carefully controlled raw-output escape hatch.
+- [ ] Compile templates to cached PHP safely; invalidate compiled templates when source changes in development.
+- [ ] Tests for directive parsing, malformed directives, nested blocks, escaping, and generated output.
+
+**Other framework shortcuts and APIs to evaluate after the underlying services are stable:** named route URL generation, redirect helpers, request input helpers, response/JSON/download helpers, configuration and environment access, session/flash helpers, validation helpers, authorization checks, and dependency resolution. These should be thin, documented entry points over real framework services—not hidden global state or magic that makes behavior difficult to trace.
+
+### Milestone 10 — Traffic management, rate limiting, and load balancing
+
+- [ ] Rate-limiter contract with configurable limits and windows.
+- [ ] In-memory limiter for tests and single-process development.
+- [ ] Redis-backed distributed limiter for multiple application instances.
+- [ ] Per-IP, per-user, and per-route policies with trusted-proxy safeguards.
+- [ ] HTTP throttling middleware and correct 429 responses/headers.
+- [ ] Application-level read/write database routing.
+- [ ] Health checks, failure detection, and configurable failover.
+- [ ] Reverse-proxy/load-balancer deployment support and trusted forwarded headers.
+- [ ] Observability for rejected requests, database health, and routing decisions.
+
+Load balancing must be treated at the correct layer: a reverse proxy/load balancer distributes HTTP traffic across application instances; database read/write splitting distributes database operations. These are related but distinct systems. Avoid implementing a custom network load balancer when mature infrastructure such as Nginx, HAProxy, or a cloud load balancer is the appropriate tool.
+
+### Milestone 11 — Trust, verification, and operational workflow
+
+- [ ] Report review and verification states.
+- [ ] Similar-report detection strategy.
+- [ ] Duplicate grouping and linking.
+- [ ] Preserve individual citizen submissions while linking them to a shared issue where appropriate.
+- [ ] Audit history for important actions.
+- [ ] Citizen, reviewer, and staff permissions.
+- [ ] Assignment, prioritization, and status transitions.
+
+### Milestone 12 — Public experience and operational features
+
+- [ ] Evidence/photo upload with validation and safe storage.
+- [ ] Location-based browsing and filtering.
+- [ ] Notifications and public issue status pages.
+- [ ] Administrative views and analytics.
+- [ ] API documentation.
+- [ ] Search and reporting capabilities appropriate to real civic data.
+
+### Milestone 13 — Production readiness
+
+- [ ] Security review and threat modelling.
+- [ ] Structured logging, metrics, tracing, and monitoring.
+- [ ] Performance and concurrency testing.
+- [ ] Backup, restore, and disaster-recovery strategy.
+- [ ] Deployment configuration and CI/CD.
+- [ ] Multi-instance deployment and infrastructure health checks.
+- [ ] Operational and developer documentation.
+
+### Milestone 15 — Built-in dashboard, admin panel, and access management
+
+**Authentication and identity foundation**
+
+- [ ] Implement secure authentication flows: registration where enabled, login/logout, password hashing, password change/reset, session rotation, remember-me only with a reviewed token design, and account status/lockout policies.
+- [ ] Define user identity and account models with validated fields, unique identifiers, safe serialization, and protected credential handling.
+- [ ] Implement authorization independently from authentication. A signed-in user is not automatically authorized to perform an action.
+- [ ] Implement roles and permissions with explicit many-to-many relationships, permission naming conventions, role assignment/revocation, and deterministic permission evaluation.
+- [ ] Add policies or equivalent resource-aware authorization for actions such as view, create, update, delete, verify, assign, publish, and administer.
+- [ ] Enforce authorization in the server-side request/controller/service layer for every protected operation. UI visibility and template directives are convenience features only.
+- [ ] Test unauthenticated, authenticated-but-forbidden, permitted, revoked-permission, inactive-account, and cross-user/resource access cases.
+
+**Built-in administrative application**
+
+- [ ] Provide a first-party admin area with its own route group, middleware, layout, navigation, dashboard, and configurable resource registry.
+- [ ] Provide dashboard cards/widgets for pending report review, report status distribution, unresolved/high-priority issues, assignment workload, recent activity, and other metrics justified by actual CivicPulse workflows.
+- [ ] Provide secure user, role, and permission administration, including role assignment and revocation with audit events.
+- [ ] Provide administrative screens for report review, verification, duplicate grouping, prioritization, assignment, category/reference-data management, and status transitions as those domain services are implemented.
+- [ ] Provide reusable resource views and actions with search, filtering, sorting, pagination, detail pages, validation, safe bulk operations, and clear empty/error states.
+- [ ] Support configurable navigation, dashboard widgets, resource fields/actions, and per-resource policies without allowing configuration to bypass authorization.
+- [ ] Record sensitive administrative actions in an append-only or tamper-evident audit design appropriate to the deployment, including actor, action, target, timestamp, and relevant change metadata while minimizing sensitive data.
+- [ ] Add accessibility, responsive behavior, CSRF protection, output escaping, secure uploads, and administrative security tests.
+- [ ] Keep the admin interface useful for CivicPulse first, while exposing stable extension points so the custom framework can reuse it in other applications.
+
+**Reusable component, resource, and stored-markup composition in templates**
+
+- [x] Build a first-class component/partial system with explicit inputs, optional named slots, predictable scope, escaping by default, and nested composition. See section 5.18.
+- [x] Specify and implement `@components('name', [...])` as the reusable component-template mechanism. It supports explicit props, default and named slots, data isolation, nested components, and escaped interpolation. See section 5.18.
+- [ ] Specify and implement `@call("include.php/style.css/main.js")` as component-scoped resource loading/registration. A partial/component can declare the resources it needs. Define HTML/CSS/JS resource types, approved roots, output locations, dependency ordering, deduplication, caching, and deterministic override precedence. An override raises the priority of the selected registered resource within the defined scope; it must never mean blindly overwriting arbitrary files on disk.
+- [ ] Specify and implement `@build(html)` as a special safe rendering path for supported text-form HTML, including markup stored in the database. Define an allowlist and sanitization/validation policy so safe markup can render while scripts, event-handler attributes, dangerous URLs, and other active content remain blocked unless a separate narrowly scoped and reviewed capability explicitly permits them. Database origin does not make content trusted. Do not use eval or treat this directive as a general escaping bypass. Any future CSS/JS build behavior must have its own explicit security contract.
+- [ ] Support layouts, reusable components, partials, component-scoped asset stacks/bundles, and page-level composition without repeated markup or duplicated script/style tags.
+- [ ] Keep these directives as distinct language features with documented responsibilities: `@build` transforms supported stored markup for safe rendering; `@call` loads/registers a component's resources and applies controlled priority; `@components` renders reusable templates with modified explicit values.
+- [ ] Test nested components, data isolation, escaping, malformed syntax, asset ordering, duplicate registration, cache invalidation, and traversal/unauthorized-path attempts.
+- [ ] Treat these strings as proposed template-language syntax, not PHP functions or already-implemented directives. Finalize grammar, parsing, nesting, error handling, cache invalidation, and security contracts before implementation.
+
+**Milestone completion criteria**
+
+- [ ] A real administrator can sign in and manage users, roles, permissions, and relevant CivicPulse resources through the browser.
+- [ ] Authorization is enforced server-side and covered by positive and negative integration tests.
+- [ ] Dashboard figures are derived from real application data, not hard-coded demo values.
+- [ ] Component and asset composition works end-to-end in rendered pages and passes security and caching tests.
+
+---
+
+### Milestone 14 — Framework developer experience, resource generators, and expressive APIs
+
+**Resource/component configuration and generators**
+
+- [ ] Build a configurable scaffolding/generator system so developers can create a resource and its related components consistently instead of manually creating disconnected files.
+- [ ] Provide focused commands such as `make:resource`, `make:model`, `make:migration`, `make:seeder`, `make:factory`, `make:controller`, `make:middleware`, `make:request`/form-request, `make:policy`, and `make:event` where the corresponding subsystem exists.
+- [ ] Support generator options to create related files together (for example, a resource with model, migration, seeder, factory, controller, validation/request class, policy, and route registration) while allowing each component to be generated independently.
+- [ ] Provide configurable resource presets/profiles, naming conventions, namespaces, directory paths, table names, primary keys, timestamps, soft deletes, API/web mode, and selected components.
+- [ ] Make generated files valid, minimal, documented, PSR-4-compatible, and consistent with the actual framework APIs; never generate placeholder methods that pretend to work.
+- [ ] Preview planned files and detect collisions before writing; require an explicit force/overwrite option for existing files.
+- [ ] Keep generator templates and defaults configurable without allowing project settings to bypass validation or security.
+- [ ] Add tests for command arguments/options, naming and namespace resolution, generated file contents, collisions, and end-to-end generated resource behavior.
+
+**Fluent schema and model developer APIs**
+
+- [ ] Provide a readable migration schema DSL, for example `Schema::create('tasks', function (Blueprint $table): void { $table->string('title', 180)->nullable()->unique(); $table->timestamps(); });`.
+- [ ] Provide a coherent model API for querying and manipulating records, while keeping model behavior distinct from schema/migration definitions.
+- [ ] Support declarative model configuration for table, primary key, casts, fillable/guarded attributes, timestamps, relationships, and serialization.
+- [ ] Add relationship and query conveniences only when backed by tested query behavior and explicit database portability rules.
+- [ ] Document the API contract and maintain compatibility tests so fluent chains do not change unexpectedly.
+
+**Framework command line and shortcuts**
+
+- [ ] Stable application bootstrap and a clear public framework API.
+- [ ] CLI command kernel, registry, help, arguments/options, exit codes, and safe console output.
+- [ ] Commands for migrations, seeders, factories, resource generation, cache operations, route listing, and environment diagnostics.
+- [ ] Consistent helper APIs for route URLs, redirects, request access, responses, configuration, sessions, validation, and authorization.
+- [ ] Template engine with a documented directive syntax and safe compilation/caching.
+- [ ] Optional facade-style access only if it remains testable, explicit, and does not obscure dependencies.
+- [ ] Developer error pages in local mode and safe, non-sensitive error responses in production.
+- [ ] Framework documentation covering setup, configuration, supported drivers, extension contracts, generators, and examples.
+- [ ] Compatibility tests for public APIs and documented shortcuts so syntax does not change unexpectedly.
+
+
+---
+
+## 8. Important Technical Notes and Decisions
+
+- **PHP version:** The current local CLI is PHP 8.5.12. Composer's project requirements should explicitly reflect the actual minimum PHP version the code supports; do not assume every deployment host has the same version.
+- **Autoloading:** Use Composer's PSR-4 autoloader. When adding a class inside an existing mapped namespace directory, Composer does not need to be regenerated for every file. Regenerate autoload metadata when mappings or autoload configuration change.
+- **Request body:** Keep the raw request body as a string at the HTTP boundary. Parse JSON or form data deliberately based on content type and the needs of a specific feature.
+- **Query strings:** Query parameters are not part of the route path. For example, `/reports?page=2` and `/reports?page=3` should match the same route; the page value is input to filtering/pagination.
+- **Responsibilities:** Request represents incoming HTTP data. Router matches a request to a handler. Application coordinates execution. Controller/application services implement application behavior. Response represents outgoing HTTP data.
+- **Database:** the initial PDO connection foundation is present. MariaDB, SQLite, and PostgreSQL 18.6 have passed local runtime tests through CivicPulse's connection layer. PostgreSQL verification used the dedicated `civicpulse_test` database and passed connection, parameterized query, connection caching, temporary-table creation, transaction commit, and rollback. Maintain a per-engine support matrix; never equate a driver class or syntax check with runtime or production support.
+- **Driver families:** relational PDO drivers, document stores, key-value stores, cache, sessions, queues, filesystem/object storage, mail, and logging are distinct adapter families. Define contracts around each family's actual behavior; do not create one universal `DriverInterface` that erases important differences.
+- **User-confirmed driver coverage requirement (2026-11-05):** The user wants CivicPulse to support the full driver/integration scope tracked in the roadmap, not only the currently implemented MySQL/MariaDB, PostgreSQL, and SQLite PDO drivers. This includes the listed relational database options (SQL Server, Oracle, Firebird, Db2, ODBC and conditionally Sybase/FreeTDS), MongoDB/document storage where justified, Redis and other cache/key-value adapters, and the separate session, queue, lock, rate-limit, and related infrastructure adapters. Implement this breadth incrementally, with a distinct contract for each adapter family and a support matrix that distinguishes planned, implemented, syntax-checked, integration-tested, and production-verified. This is a long-term compatibility requirement, not a claim that every vendor is already supported or that every adapter should be implemented before CivicPulse needs it.
+- **Relational coverage:** track MySQL/MariaDB, PostgreSQL, SQLite, SQL Server, Oracle, Firebird, Db2, and ODBC/Sybase options individually. Availability depends on PHP extensions, client libraries, operating system, and deployment environment. Prioritize tested and needed engines over an unrealistic promise to support every vendor immediately.
+- **Redis:** use it as a key-value backend through separate cache, queue, session, lock, and rate-limit services. Do not implement Redis as a PDO SQL driver.
+- **Template shortcuts:** directives such as `@csrf` are compiled template syntax backed by real CSRF/session/middleware services. Convenience syntax must never replace the security mechanism underneath it.
+- **Framework scope:** Build only what the application needs, while keeping the components reusable and understandable.
+
+---
+
+## 9. Session Handoff Checklist
+
+At the beginning of a future development session:
+
+1. Read this file first.
+2. Check the current repository state and compare it with the progress tracker.
+3. Ask for or inspect any local changes that have not been pushed.
+4. Continue from the first unchecked task in the active milestone.
+5. Do not repeat completed lessons or rebuild existing files without a reason.
+
+At the end of a meaningful session:
+
+1. Record what was implemented.
+2. Record the commands/tests run and their actual results.
+3. Check off only work that has been verified.
+4. Record known bugs, limitations, and design decisions.
+5. Set the next concrete action.
+6. Keep the README aligned with the actual public-facing project status when necessary.
+
+**Current next action:** Continue from the committed View composition, conditional-directive, and reusable component milestone in sections 5.17–5.18. The next View Engine feature to design is `@call` for controlled, component-scoped resource registration. Before implementation, inspect the current compiler, renderer, component context, and view/resource directory conventions; define resource types, approved roots, output locations, dependency ordering, deduplication, caching, scope, and deterministic override precedence. Keep `@build` separate and defer it until its stored-markup allowlist and sanitization contract is designed. CivicPulse report persistence, authentication, and authorization remain unimplemented. Source-code changes remain user-managed locally; only `context.md` is updated directly on GitHub.
+
+### 5.14 Session abstraction, configuration, and request lifecycle
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. Changes remain local; no session source commit or push has been reported.**
+
+Implemented locally:
+
+- [x] `SessionInterface` defines the session data contract: get, set, has, remove, clear, and session ID regeneration.
+- [x] `NativeSession` adapts PHP's native session storage and rejects access when no active, valid session is available.
+- [x] `config/session.php` provides environment-driven session enablement and cookie configuration, with validated booleans, non-negative lifetime, and automatic Secure-cookie mode.
+- [x] `.env.example` documents session settings; the local `.env` contains corresponding development settings and remains ignored.
+- [x] Framework-enforced PHP session policies require strict mode and cookie-only session IDs, and disable transparent session ID propagation.
+- [x] `SessionManager` validates configuration, configures PHP session/cookie settings, starts and closes sessions, tracks ownership, enforces Secure cookies on HTTPS, and rejects insecure `SameSite=None` configuration.
+- [x] `SessionMiddleware` starts the session before downstream handling, attaches the session adapter to the request, and closes the session after normal or exceptional downstream handling while preserving the original application exception.
+- [x] Session manager and middleware are registered/resolved through the application container; bootstrap tests verify the manager singleton and the exact shared manager injected into the middleware.
+- [x] The front controller registers session middleware after request ID, request logging, and security-header middleware, and before the router destination.
+- [x] Application integration verifies session availability inside a real route, response propagation, session closure, and data persistence across two application requests.
+
+**Developer-reported local verification on 2026-11-06:**
+
+- [x] `php tests/session.php` — 12 assertions passed.
+- [x] `php tests/session_config.php` — 24 assertions passed.
+- [x] `php tests/session_manager.php` — 20 assertions passed.
+- [x] `php tests/session_middleware.php` — 11 assertions passed.
+- [x] `php tests/session_application.php` — 12 assertions passed.
+- [x] `php tests/bootstrap.php` — 30 assertions passed, including session service dependency injection.
+- [x] All six reported test suites passed: 109 assertions total.
+- [x] The developer separately reported clean PHP syntax checks for `bootstrap/app.php`, `public/index.php`, and the new application session test.
+
+**Scope and limitations:**
+
+- The implementation currently uses PHP's native session handler. File/database/Redis session-store adapters remain future work and must be designed behind appropriate storage contracts if/when required.
+- CSRF token generation/validation and CSRF middleware were implemented in the subsequent local milestone recorded in section 5.15. Authentication and authorization remain future work. `SameSite=Lax` is a useful cookie policy but does not replace CSRF token validation.
+- Tests were run locally by the developer. The session changes have not been reported as committed or pushed, and no production deployment verification is claimed.
+
+**Definition of Done:** session abstraction, configuration, manager, middleware, dependency-injection integration, and two-request application persistence all passed the six locally reported test suites (109 assertions). CSRF protection was subsequently implemented and locally verified in section 5.15.
+
+
+### 5.15 CSRF protection and parsed request-body support
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. Changes remain local; no source commit or push has been reported.**
+
+Implemented locally:
+
+- [x] Request now stores parsed form data separately from the raw request body and exposes it through getParsedBody().
+- [x] Request::createFromGlobals() supplies PHP's parsed $_POST data for ordinary POST form submissions without treating raw JSON as parsed form data.
+- [x] CsrfTokenManager generates cryptographically secure 32-byte random tokens, stores them in the session, reuses valid tokens, and validates submissions using hash_equals().
+- [x] CsrfMiddleware skips validation for GET, HEAD, and OPTIONS; validates state-changing requests using the X-CSRF-Token header or _token form field; rejects missing, malformed, conflicting, or invalid tokens and requests without an attached session.
+- [x] CSRF rejection returns HTTP 403 with a plain-text content type and Cache-Control: no-store.
+- [x] The CSRF token manager is registered as a container singleton, and the middleware resolves through the container with the shared token manager.
+- [x] The front controller registers CSRF middleware after session middleware and before the router, ensuring the session is available for token validation.
+- [x] An application-level integration test exercises token generation on GET, rejection of missing/invalid tokens, acceptance of a valid token, route non-execution on rejection, and session lifecycle behavior.
+
+**Developer-reported local verification on 2026-11-06:**
+
+- [x] php tests/request_parsed_body.php — 4 checks passed.
+- [x] php tests/csrf_token_manager.php — 11 checks passed.
+- [x] php tests/csrf_middleware.php — 27 checks passed.
+- [x] php tests/csrf_application.php — 17 checks passed.
+- [x] php tests/bootstrap.php — 35 checks passed, including CSRF service registration and dependency injection.
+- [x] All five reported test scripts passed: 94 checks total.
+- [x] The developer reported no syntax errors in the CSRF application test and successful execution of the complete listed CSRF test group.
+
+**Scope and limitations:**
+
+- Ordinary PHP-parsed POST form data is supported through $_POST. JSON and other non-form request bodies remain raw; clients using non-POST state-changing methods should submit the token through the X-CSRF-Token header.
+- Token rotation policy beyond session lifecycle/regeneration has not yet been implemented as a separate policy.
+- The template compiler/view system does not exist yet, so the planned @csrf directive is not implemented. The existing token manager and middleware provide the security mechanism that a future directive must use.
+- Authentication and authorization are not implemented.
+- These results are local developer-reported tests, not production security verification. Session and CSRF changes have not been reported as committed or pushed.
+
+**Definition of Done:** parsed request-body support, token generation and validation, middleware behavior, container registration, middleware ordering, and end-to-end application integration passed the five locally reported test scripts (94 checks). The next milestone is the template/view foundation; the future @csrf directive must render a real hidden form field backed by this existing CSRF token manager.
+
+
+### 5.16 Template/view foundation and first HTML route integration
+
+**Status: Implemented and locally verified by the developer on 2026-11-06. The developer confirmed that the new HTML route works in the browser. Commit/push status for these View and Response changes has not been reported.**
+
+Implemented locally:
+
+- [x] Added the View subsystem under `framework/src/View/`: `View`, `ViewFinder`, `ViewRenderer`, `HtmlEscaper`, `Compiler/Compiler`, `Compiler/CompiledViewCache`, and the View exception classes.
+- [x] `ViewFinder` resolves named templates within the configured `resources/views/` directory and rejects invalid names and traversal outside the approved directory.
+- [x] The template compiler supports escaped `{{ ... }}` expressions and compiles templates to PHP. Templates are trusted application code; the supported expression scanner is not a complete PHP parser.
+- [x] `CompiledViewCache` stores compiled templates in `storage/framework/views/`, uses source/compiler fingerprints for cache identity, writes temporary files, and renames compiled files into place.
+- [x] `ViewRenderer` uses dependency injection for the compiled cache and HTML escaper, executes compiled templates with isolated extracted data, and handles output buffers and rendering exceptions.
+- [x] `View` provides the application-facing `render($name, $data)` API.
+- [x] Registered the View services in `bootstrap/app.php`, including explicit construction of `CompiledViewCache` with the storage path and `ViewFinder` with the resources path. Container tests verify resolution and singleton identity.
+- [x] Added `Response::html()` with the default `text/html; charset=utf-8` content type, optional status code, and custom headers. Existing JSON response behavior remains available.
+- [x] Updated route registration to receive the shared `View` service and added `GET /home`, which renders `resources/views/home.php` and returns an HTML response.
+- [x] Updated `public/index.php` to resolve the shared View service and pass it to the route-registration callback. The Router and Application classes did not need modification.
+- [x] Preserved the existing JSON endpoints: `GET /` and `GET /reports`.
+- [x] Created the first application template, `resources/views/home.php`, with escaped dynamic title, heading, description, status, and year values.
+
+**Developer-reported local test results:**
+
+- [x] `php tests/view_finder.php` — 10 passed; the symlink-specific test was skipped because symlink creation was unavailable in the Windows environment.
+- [x] `php tests/html_escaper.php` — 13 passed.
+- [x] `php tests/view_compiler.php` — 15 passed.
+- [x] `php tests/compiled_view_cache.php` — 11 passed.
+- [x] `php tests/view_renderer.php` — 11 passed.
+- [x] `php tests/view.php` — 8 passed.
+- [x] `php tests/view_container.php` — 13 passed.
+- [x] `php tests/response.php` — 17 passed.
+- [x] All eight listed View/Response test scripts passed: 98 reported checks in total.
+- [x] The developer reported successful browser rendering of `http://127.0.0.1:8000/home` ("works"). The existing JSON routes were intended to remain intact; no separate browser response capture was supplied in this checkpoint.
+
+**Architecture decisions and limitations:**
+
+- Keep rendering in the View subsystem and HTTP representation in `Response`; do not couple the Router or Application directly to template compilation.
+- Pass the shared View service explicitly to route registration. Avoid global service state or a service locator.
+- The compiled view cache is outside the public document root.
+- The compiler supports its documented interpolation syntax only; it is not a full PHP parser and does not support every possible PHP lexical construct.
+- The first `resources/views/home.php` template was initially a standalone page. Shared layout/section composition and partial inclusion were implemented in section 5.17. The parameterized component system was implemented in section 5.18; component-scoped asset composition remains planned.
+- Report persistence, authentication, authorization, and the CivicPulse administrative dashboard remain future work.
+- These are local developer-reported results. Do not claim a source commit, push, clean working tree, or synchronization without subsequent verification.
+
+**Next milestone:** design and implement `@call` for component-scoped resource registration. Inspect the current compiler, renderer, component context, and view/resource directory conventions first. Finalize typed resource declarations, approved roots, output placement, dependency ordering, deduplication, caching, component scope, and deterministic override precedence before coding. Keep `@build` separate and planned until its stored-markup sanitization contract is designed.
+
+### 5.17 Template composition and conditional directives
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `ecd1834` on 2026-11-07. The same commit also contains the reusable component implementation in section 5.18.**
+
+Implemented locally:
+
+- [x] Added layout inheritance with `@extends(...)`, named sections with `@section(...)` / `@endsection`, and layout placeholders with `@yield(...)`.
+- [x] Added partial inclusion through `@include(...)`, using the template language rather than raw PHP rendering calls in application templates.
+- [x] Added a composition context to manage layout/section state during rendering and support nested composition.
+- [x] Kept template data passing and rendering within the View subsystem; application templates must not call `$view->render(...)` directly through raw PHP snippets.
+- [x] Added `@if(...)`, `@elseif(...)`, `@else`, and `@endif` conditional directives.
+- [x] Supported nested conditional blocks and validated directive ordering: `@elseif` requires an open conditional and cannot follow `@else`; `@else` may occur only once; `@endif` closes the most recently opened conditional.
+- [x] Added validation for empty conditions, malformed/multiple arguments, unexpected closing/branch directives, duplicate `@else`, `@elseif` after `@else`, and unclosed conditional blocks.
+- [x] Kept escaped `{{ ... }}` interpolation behavior available inside conditional branches.
+- [x] Extended compiler parsing to account for nested delimiters and quoted strings when locating directive argument boundaries.
+
+**Developer-reported local verification:**
+
+- [x] `php -l tests/view.php` — no syntax errors; the View integration suite reported 13 passed, 0 failed.
+- [x] `php -l tests/view_renderer.php` — no syntax errors; the ViewRenderer suite reported 11 passed, 0 failed.
+- [x] `php -l tests/view_compiler.php` — no syntax errors; after removing a duplicate test, the compiler suite was rerun and reported 53 passed, 0 failed.
+- [x] `php -l tests/view_composition.php` — no syntax errors; the composition suite reported 20 passed, 0 failed.
+- [x] The latest reported per-suite results therefore sum to 97 passed, 0 failed. The compiler suite was rerun after its duplicate-test cleanup; the other three suite outputs were from the immediately preceding full View-suite run and were not rerun after that cleanup.
+
+**Architecture decisions and limitations:**
+
+- Keep template composition and conditional parsing in the compiler/View subsystem; do not move template rendering into route handlers or the Router.
+- Application templates use the supported directives such as `@extends`, `@section`, `@yield`, and `@include`. Do not use raw PHP calls such as `<?= $view->render(...) ?>` to compose application templates.
+- The compiler translates supported template syntax into PHP. Generated PHP is an internal compilation output, not a reason to expose arbitrary PHP execution or bypass template escaping.
+- The compiler's expression scanner is deliberately not described as a complete PHP parser. Continue to test nested delimiters, quoted strings, malformed expressions, and directive nesting.
+- `@components` is implemented and pushed in commit `ecd1834`; see section 5.18. `@call` and `@build` remain planned and distinct: controlled component-resource registration, and safe rendering of supported stored markup, respectively.
+- These test results were reported from local runs. The source changes were subsequently committed and pushed in `ecd1834`; the component milestone's final regression results are recorded in section 5.18.
+
+**Definition of Done:** layout/section composition, partial inclusion, nested conditionals, conditional syntax validation, and escaped interpolation within branches were implemented locally. The latest reported results are 97 passing tests across the four View integration, renderer, compiler, and composition suites, with the verification timing caveat recorded above.
+
+### 5.18 Reusable view components with props and slots
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `ecd1834` (`Add reusable view components with slots`) on 2026-11-07.**
+
+Implemented:
+
+- [x] Added `ComponentContext` to manage component invocation buffers, default-slot capture, named-slot capture, and component rendering frames independently from layout/section composition state.
+- [x] Added `ComponentRenderer` to resolve component templates under `resources/views/components/`, render them with explicitly supplied props and slots, and restore rendering state even when rendering fails.
+- [x] Added `@components('name')` and `@components('name', [...])` with a static quoted component name and optional explicit array-literal props.
+- [x] Component templates receive only their explicit props; caller variables are not implicitly inherited.
+- [x] Added the default slot and named slots through `@slot('name')` / `@endslot`, with `@renderSlot()` and `@renderSlot('name')` in component templates.
+- [x] Supported nested components, components inside included partials, and shared component invocation context across included partials while preserving explicit include-data isolation.
+- [x] Rejected duplicate named slots, invalid or unclosed component/slot declarations, dynamic component/slot names, and layout-composition directives inside component templates.
+- [x] Missing slots render as empty strings; missing component templates preserve `ViewNotFoundException`.
+- [x] Kept slot content as template-authored markup; escaped interpolations inside slots remain escaped. Slot rendering is not a general-purpose raw-output or database-HTML escaping bypass.
+- [x] Registered `ComponentRenderer` through the application container and integrated component context with `View`, `ViewRenderer`, and the compiler.
+
+**Developer-reported verification on 2026-11-07:**
+
+- [x] PHP syntax checks passed for `ComponentContext.php`, `ComponentRenderer.php`, `View.php`, `ViewRenderer.php`, and `Compiler.php`.
+- [x] `php tests/view.php` — 13 passed, 0 failed.
+- [x] `php tests/view_renderer.php` — 11 passed, 0 failed.
+- [x] `php tests/view_compiler.php` — 61 passed, 0 failed.
+- [x] `php tests/view_composition.php` — 20 passed, 0 failed.
+- [x] `php tests/view_components.php` — 27 passed, 0 failed.
+- [x] The selected non-database regression test loop completed successfully; the developer separately reported successful `database_factory.php`, `setup_test_database.php`, and `database_connection.php` runs against MariaDB 10.4.32.
+- [x] The eight intended source/test files passed `git diff --cached --check`, were committed as `ecd1834`, and were pushed to `origin/main`. The developer's `git status --short` was empty before the push.
+
+**Architecture decisions and remaining limitations:**
+
+- Component templates live under the approved `resources/views/components/` directory and use explicit props rather than inheriting the caller's variable scope.
+- Invocation frames capture caller-provided slot content; rendering frames expose those slots only to the component currently being rendered. This keeps nested invocation state separate from the slots available to the active component template.
+- Included partials share the active component context so a component invocation can span supported template composition, while each include still receives its explicit data array and fresh layout-composition context.
+- Component templates cannot declare layout inheritance or sections. Layouts and sections remain page-level composition features.
+- Slot markup originates in trusted application templates. Dynamic interpolations retain normal HTML escaping. Database-originated HTML remains untrusted and must be handled by the future `@build` allowlist/sanitization design.
+- `@call` and `@build` are not implemented. Do not treat component rendering as asset registration or as safe rendering of arbitrary stored markup.
+
+**Next milestone:** design and implement `@call` for component-scoped resource registration. Define its typed resource grammar, approved roots, output placement, dependency ordering, deduplication, cache behavior, component scope, and deterministic override precedence before implementation. Keep `@build` separate and planned until its stored-markup security contract is finalized.
+
+
+### 5.19 `@call` resource registration and asset resolution
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `5be99c2` (`Add view resource registration and asset resolution`) on 2026-11-07.** The developer confirmed that local `main` and `origin/main` point to `5be99c2`, and `git status -sb` reported `## main...origin/main` with no working-tree changes.
+
+**Implemented behavior:**
+
+- [x] Added `ViewResourceContext` to hold stylesheet and script registrations for one render lifecycle.
+- [x] Added resource registration with validated resource types, logical keys, and non-empty paths.
+- [x] First registration wins by default. An explicit `override => true` replaces an existing resource while preserving its original registration position.
+- [x] Added `AssetResolver` to resolve CSS under `public/assets/css/` and JavaScript under `public/assets/js/`, append the expected file extension, and return a URL rather than executing or including the asset.
+- [x] Restricted logical asset paths and rejected traversal, invalid characters, missing files, unsupported resource types, and unsafe asset base URLs.
+- [x] Checked the resolved asset directory remains within the configured public directory, including protection against an asset-root symlink escaping that directory where the environment supports symlink tests.
+- [x] Added `config/assets.php` with the public filesystem path and configurable `ASSET_BASE_URL`.
+- [x] Registered `AssetResolver` as a container singleton in `bootstrap/app.php`.
+- [x] Added `@call([...])` with typed `partials`, `styles`, and `scripts` entries. Partial templates render immediately at the directive location; asset entries are registered for later output.
+- [x] Added shorthand asset paths with deterministic default logical keys and explicit descriptors supporting `key`, `path`, and optional boolean `override`.
+- [x] Added `@resources('styles')` and `@resources('scripts')` output directives. Stylesheets render as link elements and scripts render as deferred script elements.
+- [x] Restricted resource declarations to static literal arrays and strings; dynamic expressions and unsupported resource categories are rejected by the compiler.
+- [x] Threaded the same resource context through page rendering, layouts, included partials, and nested components. Independent top-level renders receive fresh resource contexts.
+- [x] Preserved the existing three-argument `renderIncluded()` API by making its resource-context argument optional; compiled includes explicitly pass the active shared context.
+- [x] Escaped generated asset URLs when producing HTML.
+- [x] Added coverage for registration order, deduplication, explicit overrides, output placement, URL escaping, path validation, context sharing, context isolation, and container integration.
+
+**Architecture decisions and security boundaries:**
+
+- Resource state belongs to a render-scoped `ViewResourceContext`; it is not stored in a global or request-independent singleton.
+- `AssetResolver` maps logical resource paths to files beneath the approved public asset roots. It does not execute asset files.
+- The asset base URL is configuration, not caller-controlled template input. Protocol-relative URLs and traversal in the base URL are rejected.
+- Resource definitions are deliberately static. The compiler accepts a constrained literal grammar rather than evaluating arbitrary expressions.
+- The first registration determines output order. An explicit override changes the resource value without moving its position.
+- `@call` handles partial rendering and CSS/JavaScript registration only. It does not sanitize stored markup or make database-originated HTML trusted.
+- `@build` remains a separate, unimplemented feature whose stored-markup allowlist and sanitization contract must be designed independently.
+
+**Developer-reported verification on 2026-11-07:**
+
+- [x] `tests/asset_resolver.php` — 14 passed, 0 failed; two symlink-related checks were skipped because symlink testing was unsupported in the Windows environment.
+- [x] `tests/view_resource_context.php` — 10 passed, 0 failed.
+- [x] `tests/view_resources.php` — 20 passed, 0 failed.
+- [x] `tests/view_resource_integration.php` — 12 passed, 0 failed.
+- [x] `tests/view_compiler.php` — 76 passed, 0 failed.
+- [x] `tests/view_composition.php` — 22 passed, 0 failed.
+- [x] `tests/view_container.php` — 15 passed, 0 failed.
+- [x] The complete `for test in tests/*.php` regression loop reached its final test without stopping on a failure. Existing HTTP, CSRF, session, database, configuration, container, and View tests shown in the developer's output passed. The database factory reported environment-dependent PostgreSQL/SQLite driver skips; the MariaDB 10.4.32 connection, parameterized query, connection caching, and transaction checks passed.
+- [x] `git diff --check` and `git diff --cached --check` produced no errors before commit.
+- [x] Exactly 15 intended files were staged and committed: 8 modified files and 7 new files. Commit `5be99c2` recorded 2,399 insertions and 22 deletions.
+- [x] The developer pushed `5be99c2` successfully. Final local verification showed `main`, `origin/main`, and `origin/HEAD` at the same commit, with a clean working tree.
+
+**Definition of Done:** The typed `@call` and `@resources` directives, secure public asset resolution, render-scoped resource registration, deterministic deduplication/override behavior, and integration with pages, layouts, partials, and nested components are implemented, tested, committed, and pushed. The remaining symlink checks are explicitly environment-limited, not reported as passing.
+
+**Next milestone:** Keep `@build` separate. Before implementing it, design the stored-markup trust boundary, allowed HTML elements/attributes, URL and attribute validation, sanitization strategy, and tests. Do not use `@call` or slot rendering as a substitute for that security contract.
+
+### 5.20 `@build` safe stored-markup rendering
+
+**Status: Implemented, locally verified, committed, and pushed to `main` in commit `f0ee836` (`Add safe stored HTML rendering with build directive`) on 2026-11-08.** The developer confirmed that local `main`, `origin/main`, and `origin/HEAD` point to `f0ee836`, and `git status -sb` reported `## main...origin/main` with a clean working tree.
+
+**Implemented behavior:**
+
+- [x] Added `HtmlSanitizer` as a dedicated View-layer service for untrusted HTML stored in application data.
+- [x] Added the `@build($expression)` template directive. It accepts exactly one non-empty PHP expression and compiles to the dedicated `View::build()` method.
+- [x] Added `View::build(string $html)`, delegating to the sanitizer. The View constructor accepts an optional sanitizer as its sixth argument, preserving the existing constructor argument order and compatibility.
+- [x] Registered `HtmlSanitizer` as a container singleton in `bootstrap/app.php`.
+- [x] Kept ordinary `{{ ... }}` interpolation unchanged and escaped. `@build` is an explicit, separate path for restricted HTML output.
+- [x] Allowed only the documented formatting/content elements: paragraphs, generic text containers, line breaks/rules, headings h2–h4, emphasis/strong formatting, small text, lists, blockquotes, code, preformatted text, and anchors.
+- [x] Allowed only `href` and `title` on anchors; all other attributes are removed. No styles, classes, IDs, event handlers, data attributes, embedded media, images, forms, SVG, or interactive elements are allowed.
+- [x] Removed dangerous elements and their descendants, including scripts, styles, frames, objects, embedded media, SVG/MathML, forms and controls, and document-level resource elements.
+- [x] Unwrapped unsupported harmless elements while preserving sanitized safe child content.
+- [x] Validated anchor URLs, rejecting dangerous schemes, protocol-relative URLs, malformed percent encoding, control characters, backslash ambiguity, and credential-bearing or hostless HTTP(S) URLs. Safe HTTP(S), root-relative, relative, query, and fragment references are supported under the implemented policy.
+- [x] Enforced a 100 KB input limit and valid UTF-8 before parsing.
+- [x] Used PHP's `Dom\\HTMLDocument::createFromString()` with explicit UTF-8 parsing, then recursively sanitized the DOM tree and serialized only the sanitized body contents. No regex-based HTML sanitization, `eval()`, or arbitrary PHP execution was introduced.
+- [x] Added dedicated sanitizer, compiler, and View integration tests, including malformed markup, nested dangerous content, encoded URL attacks, invalid UTF-8, and oversized input.
+- [x] Added automatic cleanup of temporary files/directories created by `tests/view_build.php`.
+
+**Security and architecture decisions:**
+
+- Database-originated HTML is always untrusted, even when it is rendered through `@build`. Sanitization is performed on every render; there is no sanitizer output cache in this version.
+- `HtmlEscaper` remains unchanged and continues to protect ordinary escaped interpolation.
+- `@build` is not a general raw-output escape hatch. Its output is restricted to the explicit element, attribute, and URL allowlists implemented by `HtmlSanitizer`.
+- Dangerous elements are removed with their entire subtrees; unsupported harmless wrappers are unwrapped only after their descendants have been sanitized.
+- The sanitizer is a View service and does not change the behavior or security contract of `@call`, components, slots, or asset registration.
+- PHP 8.5's `Dom\\HTMLDocument::createFromString()` rejected `LIBXML_NONET` as an unsupported flag in the developer's environment; the implementation uses the supported flags value `0` with explicit UTF-8. Do not add unsupported flags without checking the API contract.
+
+**Developer-reported verification on 2026-11-08:**
+
+- [x] PHP syntax checks passed for all seven changed/new files: `bootstrap/app.php`, `framework/src/View/Compiler/Compiler.php`, `framework/src/View/View.php`, `framework/src/View/HtmlSanitizer.php`, `tests/html_sanitizer.php`, `tests/view_build.php`, and `tests/view_compiler.php`.
+- [x] `tests/html_sanitizer.php` — 38 passed, 0 failed.
+- [x] `tests/view_build.php` — 11 passed, 0 failed.
+- [x] `tests/view_compiler.php` — 83 passed, 0 failed.
+- [x] The complete regression loop ran all 38 PHP test scripts (excluding the autoload helper) and reported `RESULT: PASS` for every script. Other reported suite counts included `asset_resolver.php` 14, `compiled_view_cache.php` 11, `html_escaper.php` 13, `view.php` 13, `view_composition.php` 22, `view_finder.php` 10, `view_renderer.php` 11, `view_resource_context.php` 10, `view_resource_integration.php` 12, and `view_resources.php` 20; all had zero reported failures.
+- [x] The final regression log was removed after review. `git diff --check` and `git diff --cached --check` produced no errors.
+- [x] Exactly seven intended files were staged: four modified and three new. The staged diff contained 920 insertions and one deletion.
+- [x] Commit `f0ee836` was already present on `main` and `origin/main`; the subsequent commit and push commands correctly reported nothing to commit and everything up-to-date. Final status was clean.
+
+**Definition of Done:** The explicit `@build` directive, View integration, allowlist-based stored-HTML sanitization, dangerous subtree removal, safe URL handling, and dedicated regression coverage are implemented, tested across the complete 38-script suite, committed, and pushed.
+
+**Next milestone:** Plan the framework's independent extraction before treating it as a reusable production dependency. First inspect the current framework source, Composer configuration, tests, and internal dependencies to identify any CivicPulse coupling. Define a clean standalone package boundary and extraction checklist; do not create or push the separate repository until the framework can be installed, bootstrapped, and tested without CivicPulse. Preserve the current CivicPulse repository as-is during this planning stage.
+
+### 5.21 Security documentation alignment and initial code audit
+
+**Status: Documentation updated; source-level security audit in progress (2026-11-08).**
+
+The current `main` branch was inspected after the developer confirmed that `SECURITY.md` had been committed and pushed in commit `28a7726` (`Security testing features finalization and adopters`).
+
+**Documentation review:**
+
+- [x] Reviewed the existing `SECURITY.md`. Its original content was a generic web-security checklist and did not distinguish implemented CivicPulse controls from planned controls.
+- [x] Reworked `SECURITY.md` into a project-specific security posture and production-readiness checklist.
+- [x] Documented the controls confirmed in current source: four HTTP response headers, opt-in trusted-proxy handling, native session hardening, CSRF token validation and middleware ordering, escaped template interpolation, allowlist-based stored-HTML sanitization, and constrained asset resolution.
+- [x] Explicitly listed controls that remain absent or unverified, including CSP, HSTS/HTTPS enforcement, authentication, authorization/RBAC, rate limiting, session expiration, authentication-triggered session ID regeneration, CSRF token rotation, upload security, and production deployment verification.
+- [x] Preserved the distinction between source-code presence, automated test evidence, and production security verification.
+
+**Initial source inspection:**
+
+- [x] Confirmed that `SessionManager` enables PHP strict mode, cookies-only session IDs, disables transparent session ID propagation, configures HttpOnly/SameSite/Secure cookie attributes, and closes sessions through the middleware lifecycle.
+- [x] Confirmed that `CsrfMiddleware` requires an attached session for non-safe methods, accepts the token through the designated header or parsed form field, rejects contradictory values, and returns a non-cacheable 403 response for invalid requests.
+- [x] Confirmed that the front controller registers `SessionMiddleware` before `CsrfMiddleware`.
+- [x] Confirmed that `Request` ignores conflicting separately exposed duplicates of the selected forwarded headers and that proxy metadata resolution is delegated to the configured `TrustedProxyResolver`.
+- [x] Confirmed that the current trusted-proxy configuration defaults to an empty proxy list and disables forwarded-host trust.
+
+**Audit findings and open questions — not yet final conclusions:**
+
+- Session ID regeneration exists as a session abstraction capability, but no authentication flow currently exists to invoke it after login or privilege changes.
+- Idle and absolute session expiration are not implemented in the inspected session manager/configuration.
+- CSRF token rotation around authentication transitions and Origin/Referer validation defense in depth remain open.
+- CSP, HSTS, HTTPS enforcement, authentication, authorization, rate limiting, secure uploads, and production deployment verification are not established by the inspected source.
+- The session test file review and broader security review are still being completed. Do not treat this section as a completed security audit or a production-readiness approval.
+
+**Next audit steps:**
+
+1. Finish reviewing the remaining session manager/configuration/middleware tests and their failure/cleanup paths.
+2. Inspect the complete trusted-proxy resolver and its tests, HTTP header parsing edge cases, and middleware exception behavior.
+3. Review database query usage and error/logging behavior for injection, disclosure, and privilege risks.
+4. Review the View sanitizer and asset resolver against their tests and current configuration.
+5. Produce a prioritized findings list with evidence, severity, remediation, and regression tests before adding new security features.
+6. Update this section and `SECURITY.md` only when the next findings are supported by inspected source and test output.
+
+
+
+### 5.22 Framework-wide security architecture, compatibility, and scalability requirements
+
+**Status: Adopted as an architectural requirement and roadmap; implementation and verification are pending. (2026-11-08)**
+
+The developer supplied `SECURITY-REQUIREMENTS-README.md` as the security baseline for CivicPulse and the planned reusable Power PHP Framework. Its four maturity levels (Basic, Standard, Advanced, Professional), beginner glossary, OWASP/MITRE/NIST/SSDF/SLSA/CISA references, framework-specific requirements, and testing expectations are the planning basis for this milestone. The checklist is a requirements source, not proof that CivicPulse or the framework currently meets any standard or certification.
+
+**Core objective**
+
+Build professional, defense-in-depth security capabilities into the framework itself so that applications receive secure defaults and reusable protection mechanisms instead of each application independently reinventing them. These capabilities must be designed for backward compatibility, incremental adoption, and scalable deployment. The safe path should be the easiest path, and security must not be an optional paid-style add-on.
+
+**Non-negotiable architecture principles**
+
+1. **Secure by default and fail closed:** new applications should start with safe configuration. Missing, invalid, or failed security decisions must not silently grant access. Production boot should validate security-sensitive configuration and reject known-dangerous defaults where safe enforcement is possible.
+2. **Defense in depth:** use independent layers at request boundaries, routing, validation, authorization, persistence, output rendering, file handling, runtime configuration, logging, and deployment. No single header, middleware, scanner, or library is treated as complete security.
+3. **Backward compatibility:** preserve existing public APIs, constructor argument order, method signatures, route behavior, and established application behavior wherever this can be done without retaining a known exploitable vulnerability. Add optional dependencies/parameters compatibly, provide adapters for old extension points, and avoid unnecessary breaking changes.
+4. **Explicit migration for unsafe legacy behavior:** when a secure default changes behavior, document the impact, provide a migration path and actionable diagnostics, and use deprecation periods where continued operation is not itself a serious security risk. A known critical vulnerability must not be kept enabled merely for compatibility; provide a secure replacement and clearly document the necessary migration.
+5. **Modular and extensible:** security services should have small interfaces/contracts, dependency-injection bindings, configurable policies, and replaceable storage/backends. Applications may extend or replace a provider without forking framework internals. Do not create one monolithic security manager.
+6. **Scalable and concurrency-safe:** avoid request-specific mutable state in long-lived singletons or static globals. Keep request/render state scoped to the request or operation. Design session, rate-limit, cache, queue, audit-log, and key-storage integrations so they can use shared/distributed backends for multiple workers and application instances.
+7. **Performance-aware without weakening controls:** use bounded input, predictable algorithms, caching only where safe, and measurable overhead. Any cache of security decisions must have explicit invalidation/expiry semantics and must not allow stale permissions or revoked credentials to remain valid.
+8. **Testable and transparent:** each control needs positive and negative tests, failure-path tests, documented configuration, operational limitations, and evidence. Distinguish implemented, tested, externally verified, and not-yet-implemented controls in `SECURITY.md` and this context.
+
+**Framework security capability targets (planned; not claims of current implementation)**
+
+- **Request and input boundary:** central validation contracts; request/body/JSON depth and upload-size limits; safe header parsing; trusted-proxy-only client IP and scheme resolution; safe host/URL handling; strict redirect validation; SSRF-safe outbound HTTP client option.
+- **Output and injection resistance:** context-aware escaping by default; explicit and conspicuous safe-HTML opt-in; parameterized database operations as the normal path; safe identifier handling; command execution avoided or tightly constrained; mass-assignment protection and explicit field allowlists.
+- **Identity and sessions:** vetted password hashing helper (prefer Argon2id where supported, with documented secure fallback); generic authentication responses; throttling hooks; session ID regeneration after authentication and privilege changes; idle and absolute expiration; server-side logout invalidation; secure cookie defaults; MFA/passkey extension points; safe account recovery primitives. Authentication features must not be presented as complete until their complete lifecycle is implemented and tested.
+- **Authorization:** centralized policies/gates and route middleware; deny-by-default support; object ownership and property-level checks; role/permission contracts; tests for unauthenticated, forbidden, cross-user/object, revoked, and disabled-account cases. The framework provides enforcement mechanisms; each application must still define its own business permissions.
+- **Browser protections:** CSRF protection on all unsafe methods with constant-time token validation and documented token lifecycle; Origin/Referer defense in depth where appropriate; configurable CSP (report-only rollout and enforce mode); HSTS only when HTTPS deployment is confirmed; framing, MIME-sniffing, referrer, and permissions policies; strict CORS allowlists.
+- **Abuse and resource controls:** pluggable rate limiting and quotas for IP, identity, token, and route; distributed atomic limiter backends; request and pagination limits; timeouts and bounded retries; protections against resource exhaustion and sensitive business-flow abuse.
+- **Data, files, and cryptography:** secure upload validation by content, size and allowlisted type; generated storage names; storage outside public root by default; safe download disposition; least-privilege database contracts; encryption/signing through vetted high-level libraries; key rotation/provider interfaces; no custom cryptographic algorithms.
+- **Errors, audit, and operations:** generic production errors with detailed internal diagnostics; structured request-correlated logs; security-event hooks and audit trails; automatic redaction of secrets, tokens and sensitive fields; monitoring/alert integration points; backups and restore guidance; environment/config validation and secret separation.
+- **Supply chain and release assurance:** minimal reviewed dependencies and committed lockfiles; dependency and secret scanning in CI; static/dynamic security testing; SBOM and artifact provenance/signing as the release process matures; vulnerability disclosure and advisory process; documented patch and upgrade policy.
+- **AI integration boundary (if/when included):** treat model output and retrieved content as untrusted; apply least privilege to tools/agents; keep secrets out of prompts; bound tokens, cost, and execution; require approval for consequential actions.
+
+**Backward-compatibility policy**
+
+- Record the existing public API and behavior before each security change; add regression tests for current supported behavior.
+- Prefer additive interfaces, optional constructor arguments at the end, default interface adapters, and new middleware/providers over invasive rewrites.
+- Keep legacy behavior only when it is not a security bypass. If unsafe behavior must be removed, document the threat, affected APIs/configuration, migration steps, and release impact.
+- Introduce deprecations with clear warnings and a target removal release when practical; never silently downgrade a secure setting to preserve compatibility.
+- Provide an explicit compatibility/migration guide and tests that exercise both supported legacy integration paths and the new secure path.
+- Use semantic versioning consistently. Security fixes may require urgent patch releases; do not label a behavior-breaking security fix as non-breaking without evidence.
+- Do not make all controls globally mandatory in one change. Introduce them in staged, independently testable milestones, while ensuring new applications receive the safest defaults available.
+
+**Scalability and deployment policy**
+
+- Keep framework core independent of a particular cache, database, session store, queue, monitoring vendor, or cloud platform.
+- Define backend contracts for distributed sessions, rate limiting, cache, locks, audit/event delivery, and secrets/key providers; retain lightweight local adapters for development and small deployments.
+- Require atomic operations and clear consistency/expiry guarantees for distributed security-sensitive state, especially throttling, token revocation, session invalidation, and permission changes.
+- Ensure request and render state is isolated between concurrent requests and safe under persistent workers; document worker lifecycle requirements.
+- Support horizontal scaling through shared backends rather than process-local assumptions. Document single-node limitations when a shared backend is not configured.
+- Add load/concurrency tests and measure latency/memory overhead before calling a feature scalable. Do not trade away authorization, token validation, or rate-limit correctness for throughput.
+
+**Implementation and audit sequence**
+
+1. Finish the current evidence-based audit of sessions, trusted proxies, request parsing, middleware failure paths, database access, logging, View sanitization, and asset resolution. Record findings with severity, evidence, remediation, and regression tests.
+2. Complete the Basic baseline first: validation, output encoding, parameterized persistence, session lifecycle, HTTPS/deployment guidance, authorization enforcement hooks, safe errors, secrets/configuration, dependency hygiene, uploads, security headers, logging, and tested backups.
+3. Build the Standard layer: centralized authorization, authentication lifecycle, CSRF/browser policy hardening, distributed rate limiting, API schemas/limits, data protection, security-event monitoring, and CI scanning.
+4. Add Advanced capabilities where application threat models require them: tenant isolation, phishing-resistant MFA/passkeys, service identity, managed secrets/keys, runtime controls, fuzzing, and independent assurance.
+5. Establish Professional maintainer practices: SSDF-aligned secure development, signed/provenanced releases, SBOM, vulnerability disclosure/advisories, patch SLAs, incident response, and measured recovery.
+6. For each milestone, update `SECURITY.md` with only source-confirmed status and update this context with implementation decisions, compatibility impact, tests, and remaining gaps.
+
+**Definition of done for each security capability**
+
+- Threat and trust boundary are documented.
+- Secure default and failure behavior are specified.
+- Public API and backward-compatibility impact are reviewed.
+- Configuration is validated and documented.
+- Unit, integration, negative, regression, and relevant concurrency/failure tests pass.
+- Extension and distributed-backend contracts are documented where applicable.
+- Performance and operational constraints are measured or explicitly listed as unverified.
+- `SECURITY.md` accurately distinguishes implemented/tested controls from planned and externally unverified controls.
+
+**Important boundary:** This is a long-term framework architecture requirement, not authorization to implement every listed control immediately and not a claim of ASVS, OWASP, NIST, SSDF, SLSA, or other compliance. Continue one scoped milestone at a time. Preserve the CivicPulse application while designing the generic framework boundary; remove CivicPulse-specific naming and assumptions only as part of the separately planned framework extraction.
